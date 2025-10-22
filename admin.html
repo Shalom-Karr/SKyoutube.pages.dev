@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - SK Video Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css"> <!-- Link to admin CSS -->
+</head>
+<body>
+
+    <div class="admin-container">
+        <div id="login-wrapper"> <!-- New Wrapper for narrow content -->
+            <h1>Admin Login</h1>
+            <div class="login-form">
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="your.admin@email.com">
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="********">
+                </div>
+                <button id="login-button">Login</button>
+                <p id="login-error" class="error-message"></p>
+            </div>
+        </div>
+        
+        <div id="admin-content" class="hidden">
+            <!-- Admin Header -->
+            <div class="admin-header-controls">
+                <!-- Logout Button -->
+                <button id="logout-button" class="logout-btn material-icons" title="Logout">logout</button>
+            </div>
+            
+            <!-- NEW: Status Message Display -->
+            <div id="status-message"></div>
+
+            <!-- ADMIN PANEL STRUCTURE -->
+            
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="logs">User Logs</button>
+                <button class="admin-tab" data-tab="ips">Blocked IPs</button>
+            </div>
+            <!-- ... rest of content tabs ... -->
+            <div class="tab-content active" id="tab-logs">
+                <h2>User Activity Logs</h2>
+                <div class="log-controls">
+                    <input type="text" id="ip-filter" placeholder="Filter by IP address...">
+                    <button id="refresh-logs-btn" class="icon-btn material-icons" title="Refresh Logs">refresh</button>
+                </div>
+                <div class="logs-display" id="logs-display">
+                    <!-- Logs will be rendered here -->
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-ips">
+                <h2>IP Blocklist Management</h2>
+                <div class="ip-controls">
+                    <input type="text" id="add-ip-input" placeholder="Enter IP to block (e.g., 192.168.1.1)">
+                    <button id="add-ip-btn">Block IP</button>
+                </div>
+                <div class="ips-display" id="ips-display">
+                    <!-- Blocked IPs will be rendered here -->
+                </div>
+            </div>
+
+            <!-- END OF ADMIN PANEL STRUCTURE -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="admin.js" type="module"></script>
+</body>
+</html>

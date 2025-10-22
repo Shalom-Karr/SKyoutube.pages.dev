@@ -9,118 +9,162 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
+
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
-    
+
     <!-- Local Files -->
     <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
+    <!-- Ensure script is deferred but still type=module -->
+    <script src="script.js" defer type="module"></script> 
 </head>
 <body>
-
-    <!-- ======== MOBILE HEADER ======== -->
-    <header class="mobile-header">
-        <button id="toggle-sidebar-mobile" class="material-icons">menu</button>
-        <h1>SK Player</h1>
-        <button id="toggle-actions-mobile" class="material-icons">add_circle_outline</button>
-    </header>
-
-    <!-- ======== SIDEBAR (FOLLOWING) ======== -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>Following</h2>
-            <!-- This button is only visible on mobile -->
-            <button id="close-sidebar-mobile" class="material-icons">close</button>
-            <span id="checkVideosBtn" class="material-icons icon-btn" title="Check for new videos">refresh</span>
-        </div>
-        <div class="channels" id="channels-list">
-            <!-- Channels will be injected by JavaScript -->
-        </div>
-        <span class="expand-sidebar-btn material-icons" id="expand-sidebar-btn">chevron_left</span>
-    </aside>
-
-    <!-- ======== MAIN CONTENT (SAVED VIDEOS) ======== -->
-    <main class="main-content">
-        <h1>Shalom Karr's YouTube Player</h1>
-        <h2>🌟 Saved Videos</h2>
-        <div class="main-controls">
-            <div class="sort-controls">
-                <label for="sort-saved-videos">Sort by:</label>
-                <select id="sort-saved-videos" class="styled-select">
-                    <option value="date-added-desc">Recently Added</option>
-                    <option value="date-added-asc">Oldest Added</option>
-                    <option value="title-asc">Title (A-Z)</option>
-                    <option value="title-desc">Title (Z-A)</option>
-                </select>
-            </div>
-        </div>
-        <div class="saved-videos-container">
-            <div id="video-list">
-                <!-- Saved videos will be rendered here -->
-            </div>
-        </div>
-    </main>
-
-    <!-- ======== ACTION PANEL (SEARCH & ADD) ======== -->
-    <section class="action-panel" id="action-panel">
-         <button id="close-actions-mobile" class="material-icons">close</button>
-        <h2>Actions</h2>
-        <div class="action-tabs">
-            <button class="action-tab active" data-tab="embed">Embed Link</button>
-            <button class="action-tab" data-tab="videos">Search Videos</button>
-            <button class="action-tab" data-tab="channels">Search Creators</button>
-        </div>
-
-        <div class="tab-content active" id="tab-embed">
-            <div class="search-group">
-                <input type="text" id="embed-url-input" placeholder="Paste YouTube/Vimeo link...">
-                <button id="embed-button">Add</button>
-            </div>
-            <p class="helper-text">Paste a full video link from YouTube or Vimeo to add it to your saved list.</p>
-        </div>
-
-        <div class="tab-content" id="tab-videos">
-            <div class="search-group">
-                <input type="text" id="video-search-input" placeholder="Search for videos...">
-                <button id="video-search-button">Search</button>
-            </div>
-            <div class="search-results-list" id="video-search-results"></div>
-        </div>
-
-        <div class="tab-content" id="tab-channels">
-            <div class="search-group">
-                <input type="text" id="channel-search-input" placeholder="Search for creators...">
-                <button id="channel-search-button">Search</button>
-            </div>
-            <div class="search-results-list" id="channel-search-results"></div>
-        </div>
-    </section>
     
-    <!-- Dim overlay for mobile panel views -->
-    <div class="overlay" id="overlay"></div>
-
-    <!-- ======== VIDEO MODAL ======== -->
-    <div id="video-modal">
-        <div class="modal-content">
-            <div class="player-container">
-                <div id="ambient-bg"></div>
-                <iframe id="videoFrame" src="" allow="encrypted-media" allowfullscreen></iframe>
-                <img id="thumbnail-loader" crossorigin="anonymous" style="display:none;">
-            </div>
-
-            <div id="modal-video-info" class="modal-video-info">
-                <h3 id="ytTitle">Loading...</h3>
-                <p id="ytChannel"></p>
-                <div class="stats-group">
-                    <p id="ytViews"></p>
-                    <p id="ytDate"></p>
-                </div>
-            </div>
-
-            <button id="close-modal-btn">Close</button>
+    <!-- ======== PRELOADER SCREEN (Visible by default) ======== -->
+    <div id="preloader-screen" class="preloader-screen">
+        <div class="preloader-content">
+            <div class="loader-spinner"></div>
+            <p>Loading Dashboard...</p>
         </div>
     </div>
+    <!-- ==================================================== -->
+    
+    <!-- ======== IP BLOCK SCREEN (Hidden by default) ======== -->
+    <div id="access-denied-screen" class="access-denied-screen hidden">
+        <div class="denial-message">
+            <span class="material-icons denial-icon">block</span>
+            <h1>Access Denied</h1>
+            <p>Your IP address has been flagged and blocked due to abuse.</p>
+            <p>If you believe this is an error, please contact support.</p>
+            <p>For more information, please review our <a href="terms.html">Terms of Service</a>.</p>
+        </div>
+    </div>
+    <!-- ==================================================== -->
+    
+    <!-- WRAPPER FOR ALL DASHBOARD CONTENT (Initially hidden by CSS) -->
+    <div id="dashboard-wrapper"> 
+
+        <!-- ======== MOBILE HEADER ======== -->
+        <header class="mobile-header">
+            <button id="toggle-sidebar-mobile" class="material-icons">menu</button>
+            <h1>SK Player</h1>
+            <button id="toggle-actions-mobile" class="material-icons">add_circle_outline</button>
+        </header>
+
+        <!-- ======== SIDEBAR (FOLLOWING) ======== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Following</h2>
+                <!-- This button is only visible on mobile -->
+                <button id="close-sidebar-mobile" class="material-icons">close</button>
+                <span id="checkVideosBtn" class="material-icons icon-btn" title="Check for new videos">refresh</span>
+            </div>
+            <div class="channels" id="channels-list">
+                <!-- Channels will be injected by JavaScript -->
+            </div>
+            <span class="expand-sidebar-btn material-icons" id="expand-sidebar-btn">chevron_left</span>
+        </aside>
+
+        <!-- ======== MAIN CONTENT (SAVED VIDEOS) ======== -->
+        <main class="main-content">
+            <h1>Shalom Karr's YouTube Player</h1>
+            <h2>🌟 Saved Videos</h2>
+            <div class="main-controls">
+                <div class="sort-controls">
+                    <label for="sort-saved-videos">Sort by:</label>
+                    <select id="sort-saved-videos" class="styled-select">
+                        <option value="date-added-desc">Recently Added</option>
+                        <option value="date-added-asc">Oldest Added</option>
+                        <option value="title-asc">Title (A-Z)</option>
+                        <option value="title-desc">Title (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="saved-videos-container">
+                <div id="video-list">
+                    <!-- Saved videos will be rendered here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- ======== ACTION PANEL (SEARCH & ADD) ======== -->
+        <section class="action-panel" id="action-panel">
+             <button id="close-actions-mobile" class="material-icons">close</button>
+            <h2>Actions</h2>
+            <div class="action-tabs">
+                <button class="action-tab active" data-tab="embed">Embed Link</button>
+                <button class="action-tab" data-tab="videos">Search Videos</button>
+                <button class="action-tab" data-tab="channels">Search Creators</button>
+            </div>
+
+            <div class="tab-content active" id="tab-embed">
+                <div class="search-group">
+                    <input type="text" id="embed-url-input" placeholder="Paste YouTube/Vimeo link...">
+                    <button id="embed-button">Add</button>
+                </div>
+                <p class="helper-text">Paste a full video link from YouTube or Vimeo to add it to your saved list.</p>
+            </div>
+
+            <div class="tab-content" id="tab-videos">
+                <div class="search-group">
+                    <input type="text" id="video-search-input" placeholder="Search for videos...">
+                    <button id="video-search-button">Search</button>
+                </div>
+                <div class="search-results-list" id="video-search-results"></div>
+            </div>
+
+            <div class="tab-content" id="tab-channels">
+                <div class="search-group">
+                    <input type="text" id="channel-search-input" placeholder="Search for creators...">
+                    <button id="channel-search-button">Search</button>
+                </div>
+                <div class="search-results-list" id="channel-search-results"></div>
+            </div>
+        </section>
+
+        <!-- Dim overlay for mobile panel views -->
+        <div class="overlay" id="overlay"></div>
+
+        <!-- ======== VIDEO MODAL ======== -->
+        <div id="video-modal">
+            <div class="modal-content">
+                <div class="player-container">
+                    <div id="ambient-bg"></div>
+                    <iframe id="videoFrame" src="" allow="encrypted-media" allowfullscreen></iframe>
+                    <img id="thumbnail-loader" crossorigin="anonymous" style="display:none;">
+                </div>
+
+                <div id="modal-video-info" class="modal-video-info">
+                    <h3 id="ytTitle">Loading...</h3>
+                    <p id="ytChannel"></p>
+                    <div class="stats-group">
+                        <p id="ytViews"></p>
+                        <p id="ytDate"></p>
+                    </div>
+                </div>
+
+                <button id="close-modal-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- ======== FOOTER ======== -->
+        <footer class="site-footer">
+            <div class="footer-content">
+                <div class="footer-logos">
+                    <a href="https://yhstudios.github.io/">
+                        <img src="https://yhstudios.github.io/image1.png" alt="YH Studios Logo" class="footer-logo">
+                    </a>
+                    <p>Developed in conjunction by Shalom Karr and YH Studios.</p>
+                </div>
+                <div class="footer-links">
+                    <a href="terms.html">Terms of Service</a>
+                    <p>•</p>
+                    <a href="privacy.html">Privacy Policy</a>
+                </div>
+            </div>
+        </footer>
+
+    </div> <!-- End of Dashboard Wrapper -->
 
 </body>
 </html>
