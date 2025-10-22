@@ -1,0 +1,14 @@
+# netlify.toml
+
+# This section defines build-related settings.
+[build]
+  # This tells Netlify where your serverless functions are located.
+  # The path is relative to the root of your project.
+  functions = "netlify/functions"
+
+# This section defines settings for your functions.
+[functions]
+  # Specifies the Node.js runtime version. It's good practice to set this
+  # to a modern, stable version.
+  node_bundler = "esbuild"
+  node_version = "18"
