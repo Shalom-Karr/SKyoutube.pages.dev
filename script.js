@@ -1,14 +1,23 @@
+// --- START OF FILE script.js ---
+
+// --- Supabase Configuration ---
+// Note: Supabase is still used for logging and IP checks.
+import { supabase } from './supabase-client.js';
+
 // --- CONFIGURATION ---
-const API_KEYS = [
-    // IMPORTANT: REPLACE with your own YouTube Data API v3 keys
-    'AIzaSyB_O2s3Z5hJ_X8gCbjQSLZ8IfuygNwshBk',
-    'AIzaSyAoA6-FpWFCF_vpPREQjxcJ6A7suZlYM-w'
-];
-let currentApiKeyIndex = 0;
+// *** API Keys REMOVED and will now be handled by the serverless proxy ***
+const API_KEYS = []; 
+let currentApiKeyIndex = 0; // Keeping this for historical context, but it's unused now.
 const colorThief = new ColorThief();
 
 // --- DOM ELEMENT REFERENCES ---
 const body = document.body;
+// NEW REFERENCES
+const dashboardWrapper = document.getElementById('dashboard-wrapper');
+const preloaderScreen = document.getElementById('preloader-screen');
+const accessDeniedScreen = document.getElementById('access-denied-screen');
+
+// Standard references
 const sidebar = document.getElementById('sidebar');
 const actionPanel = document.getElementById('action-panel');
 const expandSidebarBtn = document.getElementById('expand-sidebar-btn');
@@ -31,13 +40,13 @@ const tabContents = document.querySelectorAll('.tab-content');
 const toggleSidebarMobileBtn = document.getElementById('toggle-sidebar-mobile');
 const toggleActionsMobileBtn = document.getElementById('toggle-actions-mobile');
 const closeActionsMobileBtn = document.getElementById('close-actions-mobile');
-const closeSidebarMobileBtn = document.getElementById('close-sidebar-mobile'); // MODIFIED: Added new button reference
+const closeSidebarMobileBtn = document.getElementById('close-sidebar-mobile');
 const overlay = document.getElementById('overlay');
-
 
 // --- LOCAL STATE ---
 let savedVideos = [];
 let followedChannels = {};
+let clientIp = 'unknown'; // Store IP globally
 
 // --- HELPER FUNCTIONS ---
 const getYouTubeVideoId = (url) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)?. [1] || null;
@@ -73,6 +82,81 @@ function timeAgo(date) {
     return 'just now';
 }
 
+// IP CHECKER remains the same, using Supabase for the list
+async function isClientIpBlocked() {
+    try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        clientIp = ipData.ip;
+
+        const { data: blockedIpsData, error } = await supabase
+            .from('blocked_ips')
+            .select('ip_address');
+
+        if (error) {
+            console.error("Error checking for blocked IP:", error);
+            return false;
+        }
+        
+        const blockedIps = blockedIpsData.map(d => d.ip_address);
+
+        for (const blockedEntry of blockedIps) {
+            if (clientIp === blockedEntry) {
+                return true;
+            }
+            const octets = blockedEntry.split('.');
+            if (octets.length === 3) {
+                 if (clientIp.startsWith(blockedEntry + '.')) {
+                     return true;
+                 }
+            }
+        }
+        return false;
+
+    } catch (e) {
+        console.error("Could not detect client IP address. Assuming non-blocked.", e);
+        return false; 
+    }
+}
+
+// --- Supabase Logging Function remains the same ---
+async function logUserActivity(videoUrl, videoTitle) {
+    
+    let currentIp = clientIp;
+    if (currentIp === 'unknown') {
+        try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            currentIp = ipData.ip;
+        } catch (e) {
+            console.error("Could not detect client IP address for logging.");
+        }
+    }
+
+    const { data: blockedIpRecord, error: blockCheckError } = await supabase
+        .from('blocked_ips')
+        .select('ip_address')
+        .eq('ip_address', currentIp)
+        .maybeSingle();
+
+    if (blockCheckError || blockedIpRecord) {
+        if (blockedIpRecord) console.warn(`Log attempt from blocked IP [${currentIp}] was prevented.`);
+        return; 
+    }
+    
+    const { error } = await supabase.from('user_logs').insert([{
+        video_url: videoUrl,
+        video_title: videoTitle,
+        ip_address: currentIp
+    }]);
+
+    if (error) {
+        console.error("Error logging user activity:", error);
+    } else {
+        console.log("User activity logged.");
+    }
+}
+
 
 // ==================================================================
 // --- LOCAL STORAGE & STATE MANAGEMENT ---
@@ -88,26 +172,47 @@ function saveChannelsToStorage() { localStorage.setItem('followedChannels', JSON
 
 
 // ==================================================================
-// --- API CALLS ---
+// --- API CALLS (USING SERVERLESS PROXY) ---
 // ==================================================================
-async function fetchWithKeyRotation(url) {
-    let attempts = 0;
-    while (attempts < API_KEYS.length) {
-        const apiKey = API_KEYS[currentApiKeyIndex];
-        const fullUrl = `${url}&key=${apiKey}`;
-        try {
-            const res = await fetch(fullUrl);
-            const data = await res.json();
-            if (data.error) throw new Error(data.error.errors[0].reason);
-            return data;
-        } catch (error) {
-            console.error(`API Error (${error.message}) with key index ${currentApiKeyIndex}. Trying next key...`);
-            currentApiKeyIndex = (currentApiKeyIndex + 1) % API_KEYS.length;
-            attempts++;
-            if (attempts >= API_KEYS.length) {
-                throw new Error("All API keys have failed. Please check your keys and quota.");
-            }
+/**
+ * Proxies the YouTube API call through a secure serverless function.
+ * @param {string} pathAndParams The YouTube API path and parameters (e.g., "videos?part=snippet&id=xyz")
+ */
+async function fetchWithKeyRotation(pathAndParams) {
+    // 1. Determine the endpoint (e.g., 'videos' or 'search')
+    const endpointMatch = pathAndParams.match(/^([a-z]+)/);
+    if (!endpointMatch) {
+         throw new Error("Invalid API path provided to proxy.");
+    }
+    const endpoint = endpointMatch[1];
+    
+    // 2. Extract the remaining parameters (everything after the '?')
+    const paramsMatch = pathAndParams.match(/\?(.*)/);
+    const params = paramsMatch ? paramsMatch[1] : '';
+    
+    // 3. Define the proxy URL based on the host
+    const hostname = window.location.hostname;
+    let proxyPath = '/api/youtubeproxy'; // Default for Cloudflare Pages/local testing
+    
+    if (hostname.endsWith('netlify.app')) {
+        proxyPath = '/.netlify/functions/youtubeproxy';
+    } else if (hostname.endsWith('pages.dev')) {
+        proxyPath = '/api/youtubeproxy';
+    }
+    
+    const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
+
+    try {
+        const res = await fetch(proxyUrl);
+        const data = await res.json();
+        
+        if (!res.ok || data.error) {
+            throw new Error(data.error || `Proxy failed with status: ${res.status}`);
         }
+        return data;
+    } catch (error) {
+        console.error(`Proxy API Error: ${error.message}`);
+        throw new Error(`Failed to fetch data via proxy: ${error.message}`);
     }
 }
 
@@ -142,13 +247,17 @@ function setAmbientColor(videoId) {
             ambientBg.style.backgroundColor = 'rgba(100,100,100,0.5)';
         }
     };
+    thumbnailLoader.onerror = () => {
+        ambientBg.style.backgroundColor = 'rgba(50,50,50,0.5)';
+    };
 }
 async function updateVideoInfoInModal(videoId) {
     modalVideoInfo.classList.remove('visible');
     ytTitle.textContent = 'Loading...';
     ytChannel.textContent = ''; ytViews.textContent = ''; ytDate.textContent = '';
     try {
-        const data = await fetchWithKeyRotation(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}`);
+        // Use new proxy call format
+        const data = await fetchWithKeyRotation(`videos?part=snippet,statistics&id=${videoId}`);
         if (data.items && data.items.length > 0) {
             const video = data.items[0];
             const views = parseInt(video.statistics.viewCount).toLocaleString();
@@ -234,26 +343,31 @@ function sortSavedVideos(key) {
     }
 }
 
-async function saveVideo(url, title = null, showNotification = true) {
+async function saveVideo(url, title = null) {
     if (savedVideos.some(v => v.url === url)) {
-        if (showNotification) alert("This video is already saved.");
+        console.log("Notification: This video is already saved.");
         return;
     }
+
     let videoTitle = title;
     if (!videoTitle && getYouTubeVideoId(url)) {
         try {
             const videoId = getYouTubeVideoId(url);
-            const data = await fetchWithKeyRotation(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}`);
+            // Use new proxy call format
+            const data = await fetchWithKeyRotation(`videos?part=snippet&id=${videoId}`);
             if (data.items.length > 0) videoTitle = data.items[0].snippet.title;
         } catch (e) { console.error("Could not fetch video title", e); }
     }
+
     const newVideo = { id: crypto.randomUUID(), url, title: videoTitle || url, dateAdded: Date.now() };
     savedVideos.unshift(newVideo);
     saveVideosToStorage();
     renderSavedVideos(sortSavedVideosSelect.value);
+
+    await logUserActivity(url, videoTitle);
 }
 
-function deleteVideo(id) {
+async function deleteVideo(id) {
     savedVideos = savedVideos.filter(video => video.id !== id);
     saveVideosToStorage();
     renderSavedVideos(sortSavedVideosSelect.value);
@@ -266,7 +380,8 @@ function deleteVideo(id) {
 async function searchYouTube(query, type, resultsContainer) {
     resultsContainer.innerHTML = '<div class="loader"></div>';
     try {
-        const data = await fetchWithKeyRotation(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
+        // Use new proxy call format
+        const data = await fetchWithKeyRotation(`search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
         resultsContainer.innerHTML = '';
         if (data.items.length === 0) {
             resultsContainer.innerHTML = '<p>No results found.</p>';
@@ -311,7 +426,7 @@ function renderChannelSearchResults(items, container) {
                 <div class="result-title">${title}</div>
                 <div class="result-description">${description}</div>
             </div>
-            <button class="follow-btn ${isFollowing ? 'unfollow' : ''}">${isFollowing ? 'Unfollow' : 'Follow'}</button>
+            <button class="follow-btn ${isFollowing ? 'unfollow' : ''}">${isFollowing ? 'Follow' : 'Follow'}</button>
         `;
 
         card.querySelector('.follow-btn').onclick = (e) => {
@@ -373,15 +488,32 @@ function removeYoutubeChannel(internalName) {
 
 async function checkAllChannels() {
     checkVideosBtn.classList.add('loading');
+    
+    document.querySelectorAll('.notification-dot').forEach(dot => dot.style.display = 'none');
+    
     const promises = Object.entries(followedChannels).map(async ([name, data]) => {
         const channelDiv = document.querySelector(`.channel[data-channel="${name}"]`);
         try {
-            const videos = await getLatestVideosWithDetails(data.id, name);
+            // First fetch search data (New proxy format)
+            const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${data.id}&maxResults=10&order=date&type=video`);
+            const videoIds = searchData.items.map(v => v.id.videoId).join(',');
+            if (!videoIds) return [];
+
+            // Second fetch details data (New proxy format)
+            const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
+
+            const videos = detailsData.items.map(item => ({
+                id: item.id,
+                title: item.snippet.title,
+                thumbnail: item.snippet.thumbnails.medium.url,
+                publishedAt: item.snippet.publishedAt,
+                viewCount: parseInt(item.statistics.viewCount || 0),
+                duration: parseYTDuration(item.contentDetails.duration)
+            }));
+
             if (videos && videos.length > 0) {
-                const sortedVideos = videos.sort((a, b) => new Date(a.publishedAt) - new Date(b.publishedAt));
+                const sortedVideos = videos.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
                 updateChannelDropdown(name, sortedVideos, true);
-                const newestVideo = sortedVideos[sortedVideos.length - 1];
-                localStorage.setItem(`lastWatched-${name}`, newestVideo.publishedAt);
             }
             if (channelDiv) {
                 channelDiv.classList.add("highlight-green");
@@ -393,35 +525,14 @@ async function checkAllChannels() {
     checkVideosBtn.classList.remove('loading');
 }
 
-async function getLatestVideosWithDetails(channelId, channelName) {
-    const lastWatchedDateStr = localStorage.getItem(`lastWatched-${channelName}`);
-    const lastWatchedDate = lastWatchedDateStr ? new Date(lastWatchedDateStr) : null;
-    
-    const searchData = await fetchWithKeyRotation(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
-    const newVideos = searchData.items.filter(item => !lastWatchedDate || new Date(item.snippet.publishedAt) > lastWatchedDate);
 
-    if (newVideos.length === 0) return [];
-    
-    const videoIds = newVideos.map(v => v.id.videoId).join(',');
-    const detailsData = await fetchWithKeyRotation(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
-    
-    return detailsData.items.map(item => ({
-        id: item.id,
-        title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.medium.url,
-        publishedAt: item.snippet.publishedAt,
-        viewCount: parseInt(item.statistics.viewCount),
-        duration: parseYTDuration(item.contentDetails.duration)
-    }));
-}
-
-function updateChannelDropdown(channelName, videos, append = false) {
+function updateChannelDropdown(channelName, videos, merge = false) {
     const container = document.getElementById(`dropdown-${channelName}`);
     const notification = document.getElementById(`notif-${channelName}`);
     if (!container || !notification) return;
 
     const storageKey = `videos-${channelName}`;
-    let storedVideos = append ? (JSON.parse(localStorage.getItem(storageKey)) || []) : [];
+    let storedVideos = merge ? (JSON.parse(localStorage.getItem(storageKey)) || []) : [];
     
     videos.forEach(video => {
         if (!storedVideos.some(v => v.id === video.id)) storedVideos.push(video);
@@ -461,15 +572,6 @@ function updateChannelDropdown(channelName, videos, append = false) {
     notification.style.display = storedVideos.length > 0 ? 'block' : 'none';
 }
 
-function restoreDropdownVideosFromStorage() {
-    Object.keys(followedChannels).forEach(channelName => {
-        const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
-        if (storedVideos.length > 0) {
-            updateChannelDropdown(channelName, storedVideos);
-        }
-    });
-}
-
 function sortDropdownVideos(videos, key) {
     switch (key) {
         case 'views':
@@ -504,12 +606,33 @@ function handleDropdownVideoClick(videoElement) {
         const notification = document.getElementById(`notif-${channelName}`);
         if(notification) notification.style.display = 'none';
     }
+    
+    const publishedDate = videoElement.dataset.published;
+    const lastWatched = localStorage.getItem(`lastWatched-${channelName}`);
+    if (!lastWatched || new Date(publishedDate) > new Date(lastWatched)) {
+         localStorage.setItem(`lastWatched-${channelName}`, publishedDate);
+    }
 }
 
 // ==================================================================
 // --- EVENT LISTENERS & INITIALIZATION ---
 // ==================================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    const isBlocked = await isClientIpBlocked();
+
+    // Animate removal of preloader and manage UI visibility
+    preloaderScreen.classList.add('hidden');
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+    preloaderScreen.style.display = 'none';
+
+    if (isBlocked) {
+        console.warn(`Access denied for blocked IP: ${clientIp}`);
+        accessDeniedScreen.classList.add('visible');
+        return; // Stop execution
+    }
+    
+    // --- Access Granted: Load Dashboard ---
+    dashboardWrapper.style.display = 'flex';
     loadStateFromStorage();
     renderSavedVideos();
     renderFollowedChannels();
@@ -555,20 +678,22 @@ channelsList.addEventListener('click', (e) => {
     if (channelInfo) {
         channelInfo.parentElement.classList.toggle('dropdown-open');
     }
-    if (saveBtn && !saveBtn.classList.contains('saved')) {
+    else if (saveBtn && !saveBtn.classList.contains('saved')) {
         e.stopPropagation();
         const videoEl = saveBtn.closest('.dropdown-video');
         const videoId = videoEl.dataset.videoId;
         const videoTitle = videoEl.dataset.title;
         const url = `https://www.youtube.com/watch?v=${videoId}`;
-        saveVideo(url, videoTitle, false);
+        saveVideo(url, videoTitle);
         saveBtn.textContent = 'bookmark_added';
         saveBtn.classList.add('saved');
     }
     else if (sortSelect) {
-         const channelName = sortSelect.dataset.channelName;
-         const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
-         updateChannelDropdown(channelName, storedVideos);
+         if (e.target === sortSelect) {
+             const channelName = sortSelect.dataset.channelName;
+             const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
+             updateChannelDropdown(channelName, storedVideos, false); 
+         }
     }
     else if (dropdownVideo) {
         handleDropdownVideoClick(dropdownVideo);
@@ -585,11 +710,11 @@ actionTabs.forEach(tab => {
         document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
     });
 });
-document.getElementById('embed-button').addEventListener('click', () => {
+document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     const url = input.value.trim();
     if(getYouTubeVideoId(url) || getVimeoVideoId(url)){
-        saveVideo(url);
+        await saveVideo(url);
         input.value = '';
     } else {
         alert("Please enter a valid YouTube or Vimeo URL.");
@@ -629,8 +754,19 @@ const togglePanel = (panel, isOpen) => {
 toggleSidebarMobileBtn.addEventListener('click', () => togglePanel(sidebar, true));
 toggleActionsMobileBtn.addEventListener('click', () => togglePanel(actionPanel, true));
 closeActionsMobileBtn.addEventListener('click', () => togglePanel(actionPanel, false));
-closeSidebarMobileBtn.addEventListener('click', () => togglePanel(sidebar, false)); // MODIFIED: Added event listener
+closeSidebarMobileBtn.addEventListener('click', () => togglePanel(sidebar, false));
 overlay.addEventListener('click', () => {
     togglePanel(sidebar, false);
     togglePanel(actionPanel, false);
 });
+
+
+// Helper to restore videos from local storage into the dropdowns
+function restoreDropdownVideosFromStorage() {
+    Object.keys(followedChannels).forEach(channelName => {
+        const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
+        if (storedVideos.length > 0) {
+            updateChannelDropdown(channelName, storedVideos, false);
+        }
+    });
+}
