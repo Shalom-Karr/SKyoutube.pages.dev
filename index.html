@@ -15,7 +15,6 @@
 
     <!-- Local Files -->
     <link rel="stylesheet" href="style.css">
-    <!-- Ensure script is deferred but still type=module -->
     <script src="script.js" defer type="module"></script> 
 </head>
 <body>
@@ -55,12 +54,10 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>Following</h2>
-                <!-- This button is only visible on mobile -->
                 <button id="close-sidebar-mobile" class="material-icons">close</button>
                 <span id="checkVideosBtn" class="material-icons icon-btn" title="Check for new videos">refresh</span>
             </div>
             <div class="channels" id="channels-list">
-                <!-- Channels will be injected by JavaScript -->
             </div>
             <span class="expand-sidebar-btn material-icons" id="expand-sidebar-btn">chevron_left</span>
         </aside>
@@ -82,7 +79,6 @@
             </div>
             <div class="saved-videos-container">
                 <div id="video-list">
-                    <!-- Saved videos will be rendered here -->
                 </div>
             </div>
         </main>
@@ -122,7 +118,6 @@
             </div>
         </section>
 
-        <!-- Dim overlay for mobile panel views -->
         <div class="overlay" id="overlay"></div>
 
         <!-- ======== VIDEO MODAL ======== -->
@@ -164,7 +159,8 @@
             </div>
         </footer>
 
-    </div> <!-- End of Dashboard Wrapper -->
+    </div>
 
 </body>
+
 </html>
