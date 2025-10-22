@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Epic Video Dashboard</title>
+    <title>SK Video Dashboard</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
 
@@ -36,7 +36,7 @@
         h1, h2, h3 {
             font-weight: 600;
         }
-        
+
         /* --- LAYOUT STRUCTURE --- */
         .sidebar {
             width: 350px;
@@ -58,7 +58,7 @@
             display: flex;
             flex-direction: column;
             padding: 20px;
-            overflow-y: hidden;
+            overflow-y: auto; /* Allow main content to scroll */
         }
 
         .action-panel {
@@ -69,7 +69,7 @@
             display: flex;
             flex-direction: column;
         }
-        
+
         /* Scrollbar styles */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: var(--surface-1); }
@@ -102,7 +102,7 @@
             flex-grow: 1;
             padding: 10px 0;
         }
-        
+
         .expand-sidebar-btn {
             font-family: 'Material Icons';
             font-size: 30px;
@@ -119,7 +119,7 @@
             border-radius: 0 8px 8px 0;
             z-index: 9;
         }
-        
+
         .channel {
             padding: 8px 20px;
             cursor: pointer;
@@ -180,55 +180,19 @@
             margin-left: auto; margin-right: 15px;
         }
 
-        /* --- MAIN CONTENT (PLAYER & SAVED VIDEOS) --- */
-        .player-container {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            margin-bottom: 20px;
-        }
-        #ambient-bg {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            filter: blur(80px);
-            transition: background-color 0.5s ease;
-            border-radius: 20px;
-            z-index: -1;
-        }
-        #videoFrame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 12px;
-            background-color: #000;
-        }
-        
-        .video-info-bar {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 10px 0;
-            visibility: hidden; /* Hidden by default */
-        }
-        .video-info-bar.visible { visibility: visible; }
-        
-        #ytChannelPicture {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-        }
-        #ytTitle {
-            font-size: 1.4rem;
-            flex-grow: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        #ytChannel { font-size: 1rem; color: var(--text-secondary); }
+        /* --- MAIN CONTENT (SAVED VIDEOS) --- */
+         .main-content h1 {
+            font-size: 2.2rem;
+            margin-bottom: 15px;
+            text-align: center;
+         }
+         .main-content h2 {
+             text-align: center;
+             margin-bottom: 25px;
+         }
 
         .saved-videos-container {
             flex-grow: 1;
-            overflow-y: auto;
             padding-right: 10px;
         }
         #video-list {
@@ -270,12 +234,107 @@
         }
         .platform-youtube { background-color: #ff0000; }
         .platform-vimeo { background-color: #00adef; }
-        
+
         .delete-btn {
             background: none; border: none; font-family: 'Material Icons';
             color: var(--text-secondary); cursor: pointer; font-size: 24px;
         }
         .delete-btn:hover { color: #ff4d4d; }
+
+
+        /* --- VIDEO PLAYER MODAL --- */
+        #video-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s 0.3s, opacity 0.3s ease;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #video-modal.visible {
+            visibility: visible;
+            opacity: 1;
+            transition: visibility 0s, opacity 0.3s ease;
+        }
+
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: auto;
+            transform: translateY(-50px);
+            transition: transform 0.4s ease;
+        }
+        #video-modal.visible .modal-content {
+             transform: translateY(0);
+        }
+
+        .player-container {
+            position: relative;
+            width: 85vw;
+            max-width: 1400px;
+            aspect-ratio: 16 / 9;
+        }
+        #ambient-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            filter: blur(80px);
+            transition: background-color 0.5s ease;
+            border-radius: 20px;
+            z-index: -1;
+        }
+        #videoFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 12px;
+            background-color: #000;
+        }
+
+        .modal-video-info {
+            width: 85vw;
+            max-width: 1400px;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            visibility: hidden;
+        }
+        .modal-video-info.visible {
+            visibility: visible;
+        }
+        #ytTitle {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        #ytChannel {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .stats-group {
+            display: flex;
+            gap: 20px;
+            color: var(--text-secondary);
+        }
+
+        #close-modal-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1rem;
+            background-color: var(--surface-2);
+            color: var(--text-primary);
+        }
+        #close-modal-btn:hover {
+            background-color: #444;
+            filter: none;
+        }
 
         /* --- ACTION PANEL (SEARCH) --- */
         .action-panel h2 { margin-bottom: 20px; }
@@ -297,11 +356,11 @@
         .tab-content.active {
             display: flex;
             flex-direction: column;
-            height: calc(100% - 100px); /* Adjust based on header height */
+            height: calc(100% - 100px);
         }
-        
+
         .search-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        
+
         input[type="text"] {
             flex-grow: 1;
             padding: 12px;
@@ -313,7 +372,7 @@
             outline: none;
         }
         input[type="text"]:focus { border-color: var(--accent-color); }
-        
+
         button {
             padding: 0.8rem 1.5rem;
             color: #fff;
@@ -343,7 +402,7 @@
             cursor: pointer;
         }
         .video-result-card:hover, .channel-result-card:hover { background-color: #3a3a3a; }
-        
+
         .video-result-card img {
             width: 120px;
             height: 67.5px;
@@ -372,7 +431,7 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        
+
         .follow-btn {
             margin-left: auto;
             align-self: center;
@@ -398,23 +457,10 @@
         <span class="expand-sidebar-btn" id="expand-sidebar-btn">&#xe5de;</span>
     </aside>
 
-    <!-- ======== MAIN CONTENT (PLAYER & SAVED VIDEOS) ======== -->
+    <!-- ======== MAIN CONTENT (SAVED VIDEOS) ======== -->
     <main class="main-content">
-        <div class="player-container">
-            <div id="ambient-bg"></div>
-            <iframe id="videoFrame" src="" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-            <img id="thumbnail-loader" crossorigin="anonymous" style="display:none;">
-        </div>
-
-        <div class="video-info-bar" id="video-info-bar">
-            <img id="ytChannelPicture" src="">
-            <div>
-                <h3 id="ytTitle">Video Title</h3>
-                <p id="ytChannel">Channel Name</p>
-            </div>
-        </div>
-
-        <h2 style="margin-bottom: 20px;">🌟 Saved Videos</h2>
+        <h1>Shalom Karr's YouTube Player</h1>
+        <h2>🌟 Saved Videos</h2>
         <div class="saved-videos-container">
             <div id="video-list">
                 <!-- Saved videos will be rendered here -->
@@ -457,8 +503,30 @@
             </div>
             <div class="search-results-list" id="channel-search-results"></div>
         </div>
-
     </section>
+
+    <!-- ======== VIDEO MODAL ======== -->
+    <div id="video-modal">
+        <div class="modal-content">
+            <div class="player-container">
+                <div id="ambient-bg"></div>
+                <iframe id="videoFrame" src="" allow="encrypted-media" allowfullscreen></iframe>
+                <img id="thumbnail-loader" crossorigin="anonymous" style="display:none;">
+            </div>
+
+            <div id="modal-video-info" class="modal-video-info">
+                <h3 id="ytTitle">Loading...</h3>
+                <p id="ytChannel"></p>
+                <div class="stats-group">
+                    <p id="ytViews"></p>
+                    <p id="ytDate"></p>
+                </div>
+            </div>
+
+            <button id="close-modal-btn">Close</button>
+        </div>
+    </div>
+
 
 <script>
 // --- CONFIGURATION ---
@@ -476,13 +544,17 @@ const expandSidebarBtn = document.getElementById('expand-sidebar-btn');
 const channelsList = document.getElementById('channels-list');
 const checkVideosBtn = document.getElementById('checkVideosBtn');
 
+const videoModal = document.getElementById('video-modal');
+const closeModalBtn = document.getElementById('close-modal-btn');
 const videoFrame = document.getElementById('videoFrame');
 const ambientBg = document.getElementById('ambient-bg');
 const thumbnailLoader = document.getElementById('thumbnail-loader');
-const videoInfoBar = document.getElementById('video-info-bar');
-const ytChannelPicture = document.getElementById('ytChannelPicture');
+
+const modalVideoInfo = document.getElementById('modal-video-info');
 const ytTitle = document.getElementById('ytTitle');
 const ytChannel = document.getElementById('ytChannel');
+const ytViews = document.getElementById('ytViews');
+const ytDate = document.getElementById('ytDate');
 
 const savedVideoList = document.getElementById('video-list');
 const actionTabs = document.querySelectorAll('.action-tab');
@@ -532,18 +604,27 @@ function saveChannelsToStorage() {
 
 
 // ==================================================================
-// --- MAIN VIDEO PLAYER LOGIC ---
+// --- MODAL VIDEO PLAYER LOGIC ---
 // ==================================================================
-function playVideoInMainPlayer(youtubeId) {
-    if (!youtubeId) {
-        videoFrame.src = "";
-        videoInfoBar.classList.remove('visible');
-        ambientBg.style.backgroundColor = 'transparent';
-        return;
-    }
-    videoFrame.src = `https://www.youtube.com/embed/${youtubeId}?autoplay=1`;
+function playVideoInModal(youtubeId) {
+    if (!youtubeId) return;
+
+    // CORRECTED: Removed 'autoplay=1' to ensure video compatibility.
+    const origin = window.location.origin;
+    videoFrame.src = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&origin=${origin}`;
+
     setAmbientColor(youtubeId);
-    updateVideoInfo(youtubeId);
+    updateVideoInfoInModal(youtubeId);
+    videoModal.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePlayer() {
+    videoModal.classList.remove('visible');
+    videoFrame.src = ""; // Stop the video
+    ambientBg.style.backgroundColor = 'transparent';
+    modalVideoInfo.classList.remove('visible');
+    document.body.style.overflow = '';
 }
 
 function setAmbientColor(videoId) {
@@ -559,29 +640,36 @@ function setAmbientColor(videoId) {
     };
 }
 
-async function updateVideoInfo(videoId) {
+async function updateVideoInfoInModal(videoId) {
+    modalVideoInfo.classList.remove('visible');
+    ytTitle.textContent = 'Loading...';
+    ytChannel.textContent = '';
+    ytViews.textContent = '';
+    ytDate.textContent = '';
+
     const apiKey = API_KEYS[currentApiKeyIndex];
     const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
     try {
         const res = await fetch(url);
         const data = await res.json();
         if (data.items && data.items.length > 0) {
-            const video = data.items[0].snippet;
-            ytTitle.textContent = video.title;
-            ytChannel.textContent = video.channelTitle;
+            const video = data.items[0];
+            const views = parseInt(video.statistics.viewCount).toLocaleString();
+            const date = new Date(video.snippet.publishedAt).toLocaleDateString(undefined, {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
 
-            const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${video.channelId}&key=${apiKey}`;
-            const channelRes = await fetch(channelUrl);
-            const channelData = await channelRes.json();
-            if(channelData.items && channelData.items.length > 0){
-                ytChannelPicture.src = channelData.items[0].snippet.thumbnails.default.url;
-            }
-            videoInfoBar.classList.add('visible');
-        } else {
-             videoInfoBar.classList.remove('visible');
+            ytTitle.textContent = video.snippet.title;
+            ytChannel.textContent = video.snippet.channelTitle;
+            ytViews.textContent = `${views} views`;
+            ytDate.textContent = `Published on ${date}`;
+
+            modalVideoInfo.classList.add('visible');
         }
     } catch (e) {
         console.error("Error fetching video info:", e);
+        ytTitle.textContent = 'Could not load video details.';
+        modalVideoInfo.classList.add('visible');
         currentApiKeyIndex = (currentApiKeyIndex + 1) % API_KEYS.length;
     }
 }
@@ -608,10 +696,10 @@ function renderSavedVideos() {
             title = video.title || `YouTube Video ${youtubeId}`;
         } else if (vimeoId) {
             platformBadge = `<span class="platform-badge platform-vimeo">Vimeo</span>`;
-            thumbnailUrl = `https://vumbnail.com/${vimeoId}.jpg`; // Using a third-party service for Vimeo thumbs
+            thumbnailUrl = `https://vumbnail.com/${vimeoId}.jpg`;
             title = video.title || `Vimeo Video ${vimeoId}`;
         } else {
-            return; // Skip if URL is not recognized
+            return;
         }
 
         const item = document.createElement('div');
@@ -637,7 +725,6 @@ async function saveVideo(url, title = null) {
     }
 
     let videoTitle = title;
-    // If it's a new YouTube link without a title, fetch it
     if (!videoTitle && getYouTubeVideoId(url)) {
         const videoId = getYouTubeVideoId(url);
         const apiKey = API_KEYS[currentApiKeyIndex];
@@ -682,13 +769,13 @@ async function searchYouTube(query, type, resultsContainer) {
     while(!success && attempts < API_KEYS.length) {
         const apiKey = API_KEYS[currentApiKeyIndex];
         const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}&key=${apiKey}`;
-        
+
         try {
             const res = await fetch(url);
             const data = await res.json();
 
             if (data.error) throw new Error(data.error.errors[0].reason);
-            
+
             success = true;
             resultsContainer.innerHTML = '';
             if (data.items.length === 0) {
@@ -732,7 +819,7 @@ function renderChannelSearchResults(items, container) {
         const { channelId, title, description, thumbnails } = item.snippet;
         const internalName = title.replace(/\s/g, '');
         const isFollowing = !!followedChannels[internalName];
-        
+
         const card = document.createElement('div');
         card.className = 'channel-result-card';
         card.innerHTML = `
@@ -743,7 +830,7 @@ function renderChannelSearchResults(items, container) {
             </div>
             <button class="follow-btn ${isFollowing ? 'unfollow' : ''}">${isFollowing ? 'Unfollow' : 'Follow'}</button>
         `;
-        
+
         card.querySelector('.follow-btn').onclick = (e) => {
             e.stopPropagation();
             if (isFollowing) {
@@ -751,7 +838,6 @@ function renderChannelSearchResults(items, container) {
             } else {
                 addYoutubeChannel(internalName, title, channelId, thumbnails.medium.url);
             }
-            // Re-render this search to update buttons
             document.getElementById('channel-search-button').click();
         };
         container.appendChild(card);
@@ -804,7 +890,7 @@ async function checkAllChannels() {
             if (videos && videos.length > 0) {
                 const sortedVideos = videos.sort((a, b) => new Date(a.snippet.publishedAt) - new Date(b.snippet.publishedAt));
                 sortedVideos.forEach(video => addVideoToDropdown(name, video));
-                
+
                 const newestVideo = sortedVideos[sortedVideos.length - 1];
                 localStorage.setItem(`lastWatched-${name}`, newestVideo.snippet.publishedAt);
             }
@@ -848,15 +934,13 @@ function addVideoToDropdown(channelName, video) {
     const { title, thumbnails, publishedAt } = video.snippet;
     const videoData = { id: videoId, title, thumbnail: thumbnails.medium.url, publishedAt };
 
-    // Save to local storage
     const storageKey = `videos-${channelName}`;
     let storedVideos = JSON.parse(localStorage.getItem(storageKey)) || [];
     if (!storedVideos.some(v => v.id === videoId)) {
         storedVideos.push(videoData);
         localStorage.setItem(storageKey, JSON.stringify(storedVideos));
     }
-    
-    // Add to DOM
+
     container.innerHTML += `
         <div class="dropdown-video" data-video-id="${videoId}" data-channel-name="${channelName}">
             <img class="dropdown-thumbnail" src="${videoData.thumbnail}" alt="${videoData.title}">
@@ -877,7 +961,7 @@ function restoreDropdownVideosFromStorage() {
             const container = document.getElementById(`dropdown-${channelName}`);
             const notification = document.getElementById(`notif-${channelName}`);
             if (!container || !notification) return;
-            
+
             storedVideos.forEach(video => {
                  container.innerHTML += `
                     <div class="dropdown-video" data-video-id="${video.id}" data-channel-name="${channelName}">
@@ -895,19 +979,16 @@ function restoreDropdownVideosFromStorage() {
 }
 
 function handleDropdownVideoClick(videoId, channelName) {
-    playVideoInMainPlayer(videoId);
+    playVideoInModal(videoId);
 
-    // Remove video from storage
     const storageKey = `videos-${channelName}`;
     let storedVideos = JSON.parse(localStorage.getItem(storageKey)) || [];
     storedVideos = storedVideos.filter(v => v.id !== videoId);
     localStorage.setItem(storageKey, JSON.stringify(storedVideos));
 
-    // Remove video from DOM
     const videoElement = document.querySelector(`.dropdown-video[data-video-id="${videoId}"]`);
     if(videoElement) videoElement.remove();
-    
-    // Hide notification dot if no videos left
+
     if(storedVideos.length === 0){
         const notification = document.getElementById(`notif-${channelName}`);
         if(notification) notification.style.display = 'none';
@@ -923,6 +1004,15 @@ document.addEventListener('DOMContentLoaded', () => {
     renderFollowedChannels();
 });
 
+// --- Modal ---
+closeModalBtn.addEventListener('click', closePlayer);
+videoModal.addEventListener('click', (e) => {
+    if (e.target === videoModal) {
+        closePlayer();
+    }
+});
+
+
 // --- Sidebar Toggle ---
 expandSidebarBtn.addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
@@ -934,7 +1024,7 @@ actionTabs.forEach(tab => {
     tab.addEventListener('click', () => {
         actionTabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        
+
         tabContents.forEach(content => content.classList.remove('active'));
         document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
     });
@@ -959,7 +1049,6 @@ document.getElementById('channel-search-button').addEventListener('click', () =>
     if (query) searchYouTube(query, 'channel', document.getElementById('channel-search-results'));
 });
 
-// Add Enter key support for search inputs
 document.getElementById('embed-url-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('embed-button').click(); });
 document.getElementById('video-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('video-search-button').click(); });
 document.getElementById('channel-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('channel-search-button').click(); });
@@ -976,7 +1065,7 @@ savedVideoList.addEventListener('click', (e) => {
     } else if (target.matches('.video-item-thumbnail')) {
         const youtubeId = target.dataset.youtubeId;
         if (youtubeId) {
-            playVideoInMainPlayer(youtubeId);
+            playVideoInModal(youtubeId);
         } else {
             alert("Playing Vimeo or non-YouTube videos in the main player is not yet supported.");
         }
@@ -993,7 +1082,7 @@ channelsList.addEventListener('click', (e) => {
         const channelName = channelInfo.dataset.name;
         const channelDiv = channelInfo.parentElement;
         const dropdown = document.getElementById(`dropdown-${channelName}`);
-        
+
         channelDiv.classList.toggle('dropdown-open');
         dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
     }
