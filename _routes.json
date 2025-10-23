@@ -1,7 +1,7 @@
 {
   "version": 1,
   "include": [
-    "/youtubeproxy"
+    "/api/youtubeproxy"
   ],
   "exclude": []
 }
