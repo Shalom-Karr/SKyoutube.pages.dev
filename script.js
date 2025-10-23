@@ -403,7 +403,6 @@ function updateChannelDropdown(channelName, videos, merge = false) {
                     <div class="dropdown-title">${video.title}</div>
                     <div class="dropdown-meta"><span>${formatViews(video.viewCount)} views</span> • <span>${timeAgo(new Date(video.publishedAt))}</span></div>
                 </div>
-                <div class="dropdown-actions"><span class="material-icons save-video-btn ${isSaved ? 'saved' : ''}" title="Save Video">${isSaved ? 'bookmark_added' : 'bookmark_add'}</span></div>
             </div>`);
     });
     notification.style.display = allVideos.length > 0 ? 'block' : 'none';
@@ -567,5 +566,6 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
+
 
 
