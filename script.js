@@ -408,8 +408,8 @@ function sortDropdownVideos(videos, key) {
 async function handleDropdownVideoClick(videoElement) {
     const { videoId, title, channelName } = videoElement.dataset;
     await saveVideo(`https://www.youtube.com/watch?v=${videoId}`, title);
-    const storageKey = `videos-${channelName}`;
     try {
+        const storageKey = `videos-${channelName}`;
         const storedData = JSON.parse(localStorage.getItem(storageKey)) || { videos: [] };
         storedData.videos = storedData.videos.filter(v => v.id !== videoId);
         localStorage.setItem(storageKey, JSON.stringify(storedData));
@@ -434,14 +434,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderFollowedChannels();
     restoreDropdownVideosFromStorage();
 });
+
 closeModalBtn.addEventListener('click', closePlayer);
 videoModal.addEventListener('click', e => e.target === videoModal && closePlayer());
 sortSavedVideosSelect.addEventListener('change', e => renderSavedVideos(e.target.value));
 savedVideoList.addEventListener('click', e => {
-    if (e.target.closest('.delete-btn')) {
-        if (confirm('Are you sure you want to delete this video?')) deleteVideo(e.target.closest('.delete-btn').dataset.id);
-    } else if (e.target.closest('.video-item-thumbnail')?.dataset.youtubeId) {
-        playVideoInModal(e.target.closest('.video-item-thumbnail').dataset.youtubeId);
+    const deleteBtn = e.target.closest('.delete-btn');
+    if (deleteBtn && confirm('Are you sure you want to delete this video?')) {
+        deleteVideo(deleteBtn.dataset.id);
+    } else {
+        const thumbnail = e.target.closest('.video-item-thumbnail');
+        if (thumbnail?.dataset.youtubeId) playVideoInModal(thumbnail.dataset.youtubeId);
     }
 });
 expandSidebarBtn.addEventListener('click', () => {
@@ -455,6 +458,7 @@ channelsList.addEventListener('click', e => {
     const dropdownVideo = e.target.closest('.dropdown-video');
     const saveBtn = e.target.closest('.save-video-btn');
     const sortSelect = e.target.closest('.sort-dropdown');
+
     if (channelInfo) {
         channelInfo.parentElement.classList.toggle('dropdown-open');
     } else if (dropdownVideo && !saveBtn) {
@@ -467,6 +471,17 @@ channelsList.addEventListener('click', e => {
         updateChannelDropdown(sortSelect.dataset.channelName, storedData.videos, false);
     }
 });
+
+// --- Action Panel Tabs --- RESTORED MISSING FUNCTIONALITY
+actionTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        actionTabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+    });
+});
+
 document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     if (getYouTubeVideoId(input.value) || getVimeoVideoId(input.value)) {
@@ -508,7 +523,7 @@ function restoreDropdownVideosFromStorage() {
     Object.entries(followedChannels).forEach(([channelName, channelData]) => {
         const storageKey = `videos-${channelName}`;
         const storedDataJSON = localStorage.getItem(storageKey);
-        // If no cache exists, fetch immediately.
+        // If no cache exists for this channel, fetch data immediately.
         if (!storedDataJSON) {
             console.log(`No cache for ${channelName}. Fetching initial data...`);
             fetchAndCacheChannelVideos(channelName, channelData.id);
@@ -517,7 +532,7 @@ function restoreDropdownVideosFromStorage() {
         try {
             const storedData = JSON.parse(storedDataJSON);
             const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
-            // If cache is stale (older than 30 days), fetch new data.
+            // If cache is stale (older than 30 days), auto-refresh it.
             if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
                 console.log(`Cache for ${channelName} is stale. Auto-refreshing...`);
                 fetchAndCacheChannelVideos(channelName, channelData.id);
