@@ -16,6 +16,7 @@ const body = document.body;
 const dashboardWrapper = document.getElementById('dashboard-wrapper');
 const preloaderScreen = document.getElementById('preloader-screen');
 const accessDeniedScreen = document.getElementById('access-denied-screen');
+const statusMessage = document.getElementById('status-message'); // For feedback
 
 // Standard references
 const sidebar = document.getElementById('sidebar');
@@ -47,6 +48,23 @@ const overlay = document.getElementById('overlay');
 let savedVideos = [];
 let followedChannels = {};
 let clientIp = 'unknown'; // Store IP globally
+
+// --- NEW: UTILITY FUNCTION FOR STATUS MESSAGES ---
+function showStatusMessage(message, type = 'success', duration = 4000) {
+    if (!statusMessage) return;
+    statusMessage.textContent = message;
+    statusMessage.className = `show ${type}`; 
+    
+    // Auto-hide the message
+    if (statusMessage.timeoutId) {
+        clearTimeout(statusMessage.timeoutId);
+    }
+    statusMessage.timeoutId = setTimeout(() => {
+        statusMessage.classList.remove('show', 'success', 'error');
+        statusMessage.textContent = '';
+    }, duration);
+}
+
 
 // --- HELPER FUNCTIONS ---
 const getYouTubeVideoId = (url) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)?. [1] || null;
@@ -192,12 +210,13 @@ async function fetchWithKeyRotation(pathAndParams) {
     
     // 3. Define the proxy URL based on the host
     const hostname = window.location.hostname;
-    let proxyPath = '/api/youtubeproxy'; // Default for Cloudflare Pages/local testing
-    
+    let proxyPath;
+
     if (hostname.endsWith('netlify.app')) {
         proxyPath = '/.netlify/functions/youtubeproxy';
-    } else if (hostname.endsWith('pages.dev')) {
-        proxyPath = '/api/youtubeproxy';
+    } else {
+        // Default to Cloudflare Pages or other environments
+        proxyPath = '/youtubeproxy';
     }
     
     const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
@@ -256,7 +275,6 @@ async function updateVideoInfoInModal(videoId) {
     ytTitle.textContent = 'Loading...';
     ytChannel.textContent = ''; ytViews.textContent = ''; ytDate.textContent = '';
     try {
-        // Use new proxy call format
         const data = await fetchWithKeyRotation(`videos?part=snippet,statistics&id=${videoId}`);
         if (data.items && data.items.length > 0) {
             const video = data.items[0];
@@ -345,7 +363,7 @@ function sortSavedVideos(key) {
 
 async function saveVideo(url, title = null) {
     if (savedVideos.some(v => v.url === url)) {
-        console.log("Notification: This video is already saved.");
+        showStatusMessage('This video is already saved.', 'error');
         return;
     }
 
@@ -353,7 +371,6 @@ async function saveVideo(url, title = null) {
     if (!videoTitle && getYouTubeVideoId(url)) {
         try {
             const videoId = getYouTubeVideoId(url);
-            // Use new proxy call format
             const data = await fetchWithKeyRotation(`videos?part=snippet&id=${videoId}`);
             if (data.items.length > 0) videoTitle = data.items[0].snippet.title;
         } catch (e) { console.error("Could not fetch video title", e); }
@@ -363,6 +380,7 @@ async function saveVideo(url, title = null) {
     savedVideos.unshift(newVideo);
     saveVideosToStorage();
     renderSavedVideos(sortSavedVideosSelect.value);
+    showStatusMessage('Video saved successfully!', 'success');
 
     await logUserActivity(url, videoTitle);
 }
@@ -371,6 +389,7 @@ async function deleteVideo(id) {
     savedVideos = savedVideos.filter(video => video.id !== id);
     saveVideosToStorage();
     renderSavedVideos(sortSavedVideosSelect.value);
+    showStatusMessage('Video deleted.', 'success');
 }
 
 
@@ -380,7 +399,6 @@ async function deleteVideo(id) {
 async function searchYouTube(query, type, resultsContainer) {
     resultsContainer.innerHTML = '<div class="loader"></div>';
     try {
-        // Use new proxy call format
         const data = await fetchWithKeyRotation(`search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
         resultsContainer.innerHTML = '';
         if (data.items.length === 0) {
@@ -436,6 +454,7 @@ function renderChannelSearchResults(items, container) {
             } else {
                 addYoutubeChannel(internalName, title, channelId, thumbnails.medium.url);
             }
+            // Refresh search results to show updated follow status
             searchYouTube(document.getElementById('channel-search-input').value, 'channel', document.getElementById('channel-search-results'));
         };
         container.appendChild(card);
@@ -475,15 +494,26 @@ function renderFollowedChannels() {
 }
 
 function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
+    if (followedChannels[internalName]) return; // Already following
+
     followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl };
     saveChannelsToStorage();
     renderFollowedChannels();
+    showStatusMessage(`Following ${displayName}`, 'success');
+
+    // --- NEW: Log when a channel is followed ---
+    const channelUrl = `https://www.youtube.com/channel/${channelId}`;
+    logUserActivity(channelUrl, `Followed: ${displayName}`);
 }
 
 function removeYoutubeChannel(internalName) {
+    const channelData = followedChannels[internalName];
+    if (!channelData) return;
+
     delete followedChannels[internalName];
     saveChannelsToStorage();
     renderFollowedChannels();
+    showStatusMessage(`Unfollowed ${channelData.displayName}`, 'success');
 }
 
 async function checkAllChannels() {
@@ -494,12 +524,10 @@ async function checkAllChannels() {
     const promises = Object.entries(followedChannels).map(async ([name, data]) => {
         const channelDiv = document.querySelector(`.channel[data-channel="${name}"]`);
         try {
-            // First fetch search data (New proxy format)
             const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${data.id}&maxResults=10&order=date&type=video`);
             const videoIds = searchData.items.map(v => v.id.videoId).join(',');
             if (!videoIds) return [];
 
-            // Second fetch details data (New proxy format)
             const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
 
             const videos = detailsData.items.map(item => ({
@@ -590,11 +618,17 @@ function sortDropdownVideos(videos, key) {
     }
 }
 
-function handleDropdownVideoClick(videoElement) {
+// --- UPDATED: This function now saves the video instead of playing it ---
+async function handleDropdownVideoClick(videoElement) {
     const videoId = videoElement.dataset.videoId;
+    const videoTitle = videoElement.dataset.title;
     const channelName = videoElement.dataset.channelName;
-    playVideoInModal(videoId);
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
 
+    // Save the video to the main list
+    await saveVideo(url, videoTitle);
+    
+    // Remove the video from the dropdown list as it has been actioned
     const storageKey = `videos-${channelName}`;
     let storedVideos = JSON.parse(localStorage.getItem(storageKey)) || [];
     storedVideos = storedVideos.filter(v => v.id !== videoId);
@@ -602,15 +636,9 @@ function handleDropdownVideoClick(videoElement) {
 
     videoElement.remove();
 
-    if(storedVideos.length === 0){
+    if (storedVideos.length === 0) {
         const notification = document.getElementById(`notif-${channelName}`);
-        if(notification) notification.style.display = 'none';
-    }
-    
-    const publishedDate = videoElement.dataset.published;
-    const lastWatched = localStorage.getItem(`lastWatched-${channelName}`);
-    if (!lastWatched || new Date(publishedDate) > new Date(lastWatched)) {
-         localStorage.setItem(`lastWatched-${channelName}`, publishedDate);
+        if (notification) notification.style.display = 'none';
     }
 }
 
@@ -717,7 +745,7 @@ document.getElementById('embed-button').addEventListener('click', async () => {
         await saveVideo(url);
         input.value = '';
     } else {
-        alert("Please enter a valid YouTube or Vimeo URL.");
+        showStatusMessage("Please enter a valid YouTube or Vimeo URL.", "error");
     }
 });
 document.getElementById('video-search-button').addEventListener('click', () => {
