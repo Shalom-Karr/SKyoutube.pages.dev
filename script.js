@@ -130,19 +130,13 @@ async function fetchWithKeyRotation(pathAndParams) {
     const endpoint = pathAndParams.match(/^([a-z]+)/)?.[1];
     if (!endpoint) throw new Error("Invalid API path provided to proxy.");
     const params = pathAndParams.match(/\?(.*)/)?.[1] || '';
-    
-    // --- THIS IS THE CORRECTED LOGIC ---
     const hostname = window.location.hostname;
     let proxyPath;
-
     if (hostname.endsWith('netlify.app')) {
         proxyPath = '/.netlify/functions/youtubeproxy';
     } else {
-        // Default to the Cloudflare/standard path for all other cases (e.g., pages.dev, localhost)
         proxyPath = '/api/youtubeproxy';
     }
-    // --- END OF CORRECTION ---
-
     const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
     try {
         const res = await fetch(proxyUrl);
@@ -464,9 +458,9 @@ checkVideosBtn.addEventListener('click', checkAllChannels);
 channelsList.addEventListener('click', e => {
     const channelInfo = e.target.closest('.channel-info');
     const dropdownVideo = e.target.closest('.dropdown-video');
-    const saveBtn = e.target.closest('.save-video-btn');
     const sortSelect = e.target.closest('.sort-dropdown');
-if (channelInfo) {
+
+    if (channelInfo) {
         const channelElement = channelInfo.parentElement;
         const wasOpen = channelElement.classList.contains('dropdown-open');
 
@@ -483,18 +477,14 @@ if (channelInfo) {
         // Now, toggle the master class on the sidebar itself
         const isAnyChannelOpen = !!channelsList.querySelector('.channel.dropdown-open');
         sidebar.classList.toggle('channel-expanded', isAnyChannelOpen);
-    }
-    } else if (dropdownVideo && !saveBtn) {
+
+    } else if (dropdownVideo) {
         handleDropdownVideoClick(dropdownVideo);
-    } else if (saveBtn && !saveBtn.classList.contains('saved')) {
-        e.stopPropagation();
-        handleDropdownVideoClick(saveBtn.closest('.dropdown-video'));
     } else if (sortSelect) {
         const storedData = JSON.parse(localStorage.getItem(`videos-${sortSelect.dataset.channelName}`)) || { videos: [] };
         updateChannelDropdown(sortSelect.dataset.channelName, storedData.videos, false);
     }
 });
-// --- RESTORED: This entire block was missing in the last refactor ---
 actionTabs.forEach(tab => {
     tab.addEventListener('click', () => {
         actionTabs.forEach(t => t.classList.remove('active'));
@@ -503,7 +493,6 @@ actionTabs.forEach(tab => {
         document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
     });
 });
-// --- END OF RESTORED BLOCK ---
 document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     if (getYouTubeVideoId(input.value) || getVimeoVideoId(input.value)) {
@@ -566,6 +555,3 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
-
-
-
