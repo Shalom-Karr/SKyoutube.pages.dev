@@ -139,7 +139,7 @@ async function fetchWithKeyRotation(pathAndParams) {
         proxyPath = '/.netlify/functions/youtubeproxy';
     } else {
         // Default to the Cloudflare/standard path for all other cases (e.g., pages.dev, localhost)
-        proxyPath = '/youtubeproxy';
+        proxyPath = '/api/youtubeproxy';
     }
     // --- END OF CORRECTION ---
 
@@ -551,3 +551,4 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
+
