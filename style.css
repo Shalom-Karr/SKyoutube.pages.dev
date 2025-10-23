@@ -149,6 +149,40 @@ input[type="text"]:focus, .styled-select:focus {
 }
 @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+
+/* --- Status Message Styles (NEW) --- */
+#status-message {
+    width: 100%;
+    max-width: 900px;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    border-radius: var(--border-radius);
+    text-align: center;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s ease, background-color 0.3s ease;
+    height: 0; /* Hidden state height */
+    overflow: hidden;
+}
+
+#status-message.show {
+    opacity: 1;
+    height: auto; /* Visible state height */
+    min-height: 40px;
+}
+
+#status-message.success {
+    background-color: rgba(40, 167, 69, 0.15); /* green-color */
+    color: var(--green-color);
+    border: 1px solid var(--green-color);
+}
+
+#status-message.error {
+    background-color: rgba(255, 77, 77, 0.15); /* red-color */
+    color: var(--red-color);
+    border: 1px solid var(--red-color);
+}
+
 /* --- SIDEBAR --- */
 .sidebar-header {
     padding: 15px 20px; display: flex;
