@@ -216,32 +216,32 @@ input[type="text"]:focus, .styled-select:focus {
 @keyframes flash-green { 0% { background-color: rgba(40, 167, 69, 0.4); } 100% { background-color: transparent; } }
 .channel.highlight-green { animation: flash-green 1.5s ease forwards; }
 
-/* This is the new, smarter set of rules */
+
+/* Make sure your .video-dropdown rule looks like this again */
 .video-dropdown {
-    /* Initially hide the dropdown and set its position */
     display: none;
-    position: absolute;
-    left: 100%; /* Position it just to the right of the sidebar */
-    top: 0;
-    
-    /* Set the new, wider size */
-    width: 450px; /* <--- YOU CAN TWEAK THIS VALUE */
-    max-height: 100vh; /* Allow it to take up the full screen height */
-    
-    /* Styling */
-    background-color: var(--surface-1);
-    border-left: 1px solid var(--border-color);
-    box-shadow: 10px 0 25px rgba(0,0,0,0.3);
-    z-index: 1; /* Ensure it appears above the main content's margin */
-    
-    /* Add padding for internal content */
-    padding: 20px;
+    margin-left: 32px;
+    padding-left: 20px;
+    border-left: 2px solid var(--surface-2);
+    margin-top: 10px;
+    max-height: 300px;
     overflow-y: auto;
 }
 
-/* This rule remains the same - it just shows the dropdown */
-.channel.dropdown-open .video-dropdown {
-    display: block;
+/* The new, wider state for the sidebar */
+.sidebar.channel-expanded {
+    width: 500px; /* <--- Set your desired expanded width here */
+}
+
+/* Adjust the main content and footer margins when the sidebar is expanded */
+body:not(.sidebar-collapsed) .main-content,
+body:not(.sidebar-collapsed) .footer-content {
+    margin-left: 500px; /* <--- This MUST match the width above */
+}
+
+/* Add a smooth transition to all the affected elements */
+.sidebar, .main-content, .footer-content {
+    transition: width 0.4s var(--cubic-bezier), margin-left 0.4s var(--cubic-bezier);
 }
 
 .channel.dropdown-open .video-dropdown { display: block; }
