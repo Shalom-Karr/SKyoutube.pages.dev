@@ -467,8 +467,24 @@ channelsList.addEventListener('click', e => {
     const dropdownVideo = e.target.closest('.dropdown-video');
     const saveBtn = e.target.closest('.save-video-btn');
     const sortSelect = e.target.closest('.sort-dropdown');
-    if (channelInfo) {
-        channelInfo.parentElement.classList.toggle('dropdown-open');
+if (channelInfo) {
+        const channelElement = channelInfo.parentElement;
+        const wasOpen = channelElement.classList.contains('dropdown-open');
+
+        // First, close any other open channels
+        channelsList.querySelectorAll('.channel.dropdown-open').forEach(openChannel => {
+            openChannel.classList.remove('dropdown-open');
+        });
+
+        // If the clicked channel was NOT already open, open it
+        if (!wasOpen) {
+            channelElement.classList.add('dropdown-open');
+        }
+
+        // Now, toggle the master class on the sidebar itself
+        const isAnyChannelOpen = !!channelsList.querySelector('.channel.dropdown-open');
+        sidebar.classList.toggle('channel-expanded', isAnyChannelOpen);
+    }
     } else if (dropdownVideo && !saveBtn) {
         handleDropdownVideoClick(dropdownVideo);
     } else if (saveBtn && !saveBtn.classList.contains('saved')) {
@@ -551,4 +567,5 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
+
 
