@@ -524,3 +524,42 @@ input[type="text"]:focus, .styled-select:focus {
     }
     .mobile-bottom-nav a:hover { color: var(--text-primary); }
 }
+
+/* --- Add this new block to your style.css --- */
+
+/* Style for the channel row ONLY when the dropdown is open */
+.channel.dropdown-open .channel-info {
+    /* Switch to a vertical layout */
+    flex-direction: column;
+    /* Center the items horizontally */
+    align-items: center;
+    /* Add some padding for breathing room */
+    padding-bottom: 15px;
+    /* Optional: Add a subtle line to separate it from the dropdown videos */
+    border-bottom: 1px solid var(--surface-2);
+    margin-bottom: 10px;
+}
+
+/* Enlarge the thumbnail when the dropdown is open */
+.channel.dropdown-open .channel-info img {
+    width: 60px;
+    height: 60px;
+}
+
+/* Allow the creator name to wrap if it's long */
+.channel.dropdown-open .channel-info .creator {
+    white-space: normal;
+    text-align: center;
+}
+
+/* Reposition the expand/collapse arrow to the top right */
+.channel.dropdown-open .channel-info .expandChannel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+/* Hide the notification dot when expanded, as it's less relevant */
+.channel.dropdown-open .channel-info .notification-dot {
+    display: none;
+}
