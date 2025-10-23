@@ -130,7 +130,19 @@ async function fetchWithKeyRotation(pathAndParams) {
     const endpoint = pathAndParams.match(/^([a-z]+)/)?.[1];
     if (!endpoint) throw new Error("Invalid API path provided to proxy.");
     const params = pathAndParams.match(/\?(.*)/)?.[1] || '';
-    const proxyPath = window.location.hostname.endsWith('netlify.app') ? '/.netlify/functions/youtubeproxy' : '/youtubeproxy';
+    
+    // --- THIS IS THE CORRECTED LOGIC ---
+    const hostname = window.location.hostname;
+    let proxyPath;
+
+    if (hostname.endsWith('netlify.app')) {
+        proxyPath = '/.netlify/functions/youtubeproxy';
+    } else {
+        // Default to the Cloudflare/standard path for all other cases (e.g., pages.dev, localhost)
+        proxyPath = '/youtubeproxy';
+    }
+    // --- END OF CORRECTION ---
+
     const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
     try {
         const res = await fetch(proxyUrl);
@@ -346,7 +358,7 @@ async function fetchAndCacheChannelVideos(channelName, channelId) {
     try {
         const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
         const videoIds = searchData.items.map(v => v.id.videoId).join(',');
-        if (!videoIds) return [];
+        if (!videoIds) return;
         const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
         const videos = detailsData.items.map(item => ({
             id: item.id, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url,
@@ -434,17 +446,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderFollowedChannels();
     restoreDropdownVideosFromStorage();
 });
-
 closeModalBtn.addEventListener('click', closePlayer);
 videoModal.addEventListener('click', e => e.target === videoModal && closePlayer());
 sortSavedVideosSelect.addEventListener('change', e => renderSavedVideos(e.target.value));
 savedVideoList.addEventListener('click', e => {
-    const deleteBtn = e.target.closest('.delete-btn');
-    if (deleteBtn && confirm('Are you sure you want to delete this video?')) {
-        deleteVideo(deleteBtn.dataset.id);
-    } else {
-        const thumbnail = e.target.closest('.video-item-thumbnail');
-        if (thumbnail?.dataset.youtubeId) playVideoInModal(thumbnail.dataset.youtubeId);
+    if (e.target.closest('.delete-btn')) {
+        if (confirm('Are you sure you want to delete this video?')) deleteVideo(e.target.closest('.delete-btn').dataset.id);
+    } else if (e.target.closest('.video-item-thumbnail')?.dataset.youtubeId) {
+        playVideoInModal(e.target.closest('.video-item-thumbnail').dataset.youtubeId);
     }
 });
 expandSidebarBtn.addEventListener('click', () => {
@@ -458,7 +467,6 @@ channelsList.addEventListener('click', e => {
     const dropdownVideo = e.target.closest('.dropdown-video');
     const saveBtn = e.target.closest('.save-video-btn');
     const sortSelect = e.target.closest('.sort-dropdown');
-
     if (channelInfo) {
         channelInfo.parentElement.classList.toggle('dropdown-open');
     } else if (dropdownVideo && !saveBtn) {
@@ -471,8 +479,7 @@ channelsList.addEventListener('click', e => {
         updateChannelDropdown(sortSelect.dataset.channelName, storedData.videos, false);
     }
 });
-
-// --- Action Panel Tabs --- RESTORED MISSING FUNCTIONALITY
+// --- RESTORED: This entire block was missing in the last refactor ---
 actionTabs.forEach(tab => {
     tab.addEventListener('click', () => {
         actionTabs.forEach(t => t.classList.remove('active'));
@@ -481,7 +488,7 @@ actionTabs.forEach(tab => {
         document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
     });
 });
-
+// --- END OF RESTORED BLOCK ---
 document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     if (getYouTubeVideoId(input.value) || getVimeoVideoId(input.value)) {
@@ -518,12 +525,10 @@ overlay.addEventListener('click', () => {
     togglePanel(sidebar, false);
     togglePanel(actionPanel, false);
 });
-// --- FINAL VERSION: Restores cache, auto-refreshes stale data, and fetches if no cache exists. ---
 function restoreDropdownVideosFromStorage() {
     Object.entries(followedChannels).forEach(([channelName, channelData]) => {
         const storageKey = `videos-${channelName}`;
         const storedDataJSON = localStorage.getItem(storageKey);
-        // If no cache exists for this channel, fetch data immediately.
         if (!storedDataJSON) {
             console.log(`No cache for ${channelName}. Fetching initial data...`);
             fetchAndCacheChannelVideos(channelName, channelData.id);
@@ -532,19 +537,17 @@ function restoreDropdownVideosFromStorage() {
         try {
             const storedData = JSON.parse(storedDataJSON);
             const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
-            // If cache is stale (older than 30 days), auto-refresh it.
             if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
                 console.log(`Cache for ${channelName} is stale. Auto-refreshing...`);
                 fetchAndCacheChannelVideos(channelName, channelData.id);
             } 
-            // Otherwise, if cache is fresh and has videos, display them.
             else if (storedData.videos && storedData.videos.length > 0) {
                 updateChannelDropdown(channelName, storedData.videos, false);
             }
         } catch (e) {
             console.error(`Clearing corrupted data for ${channelName} and re-fetching:`, e);
             localStorage.removeItem(storageKey);
-            fetchAndCacheChannelVideos(channelName, channelData.id); // Re-fetch on error
+            fetchAndCacheChannelVideos(channelName, channelData.id);
         }
     });
 }
