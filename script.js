@@ -197,25 +197,21 @@ function saveChannelsToStorage() { localStorage.setItem('followedChannels', JSON
  * @param {string} pathAndParams The YouTube API path and parameters (e.g., "videos?part=snippet&id=xyz")
  */
 async function fetchWithKeyRotation(pathAndParams) {
-    // 1. Determine the endpoint (e.g., 'videos' or 'search')
     const endpointMatch = pathAndParams.match(/^([a-z]+)/);
     if (!endpointMatch) {
          throw new Error("Invalid API path provided to proxy.");
     }
     const endpoint = endpointMatch[1];
     
-    // 2. Extract the remaining parameters (everything after the '?')
     const paramsMatch = pathAndParams.match(/\?(.*)/);
     const params = paramsMatch ? paramsMatch[1] : '';
     
-    // 3. Define the proxy URL based on the host
     const hostname = window.location.hostname;
     let proxyPath;
 
     if (hostname.endsWith('netlify.app')) {
         proxyPath = '/.netlify/functions/youtubeproxy';
     } else {
-        // Default to Cloudflare Pages or other environments
         proxyPath = '/youtubeproxy';
     }
     
@@ -553,19 +549,25 @@ async function checkAllChannels() {
     checkVideosBtn.classList.remove('loading');
 }
 
-
+// --- UPDATED: Now saves a timestamp for compliance ---
 function updateChannelDropdown(channelName, videos, merge = false) {
     const container = document.getElementById(`dropdown-${channelName}`);
     const notification = document.getElementById(`notif-${channelName}`);
     if (!container || !notification) return;
 
     const storageKey = `videos-${channelName}`;
-    let storedVideos = merge ? (JSON.parse(localStorage.getItem(storageKey)) || []) : [];
+    let storedVideos = merge ? (JSON.parse(localStorage.getItem(storageKey))?.videos || []) : [];
     
     videos.forEach(video => {
         if (!storedVideos.some(v => v.id === video.id)) storedVideos.push(video);
     });
-    localStorage.setItem(storageKey, JSON.stringify(storedVideos));
+
+    // Store data as an object with a timestamp
+    const dataToStore = {
+        timestamp: Date.now(),
+        videos: storedVideos
+    };
+    localStorage.setItem(storageKey, JSON.stringify(dataToStore));
 
     const sortKey = container.querySelector('.sort-dropdown')?.value || 'newest';
     sortDropdownVideos(storedVideos, sortKey);
@@ -630,9 +632,16 @@ async function handleDropdownVideoClick(videoElement) {
     
     // Remove the video from the dropdown list as it has been actioned
     const storageKey = `videos-${channelName}`;
-    let storedVideos = JSON.parse(localStorage.getItem(storageKey)) || [];
+    const storedData = JSON.parse(localStorage.getItem(storageKey)) || { videos: [] };
+    let storedVideos = storedData.videos;
+
     storedVideos = storedVideos.filter(v => v.id !== videoId);
-    localStorage.setItem(storageKey, JSON.stringify(storedVideos));
+
+    // Save the updated list back to storage with the original timestamp
+    localStorage.setItem(storageKey, JSON.stringify({
+        timestamp: storedData.timestamp || Date.now(),
+        videos: storedVideos
+    }));
 
     videoElement.remove();
 
@@ -648,7 +657,6 @@ async function handleDropdownVideoClick(videoElement) {
 document.addEventListener('DOMContentLoaded', async () => {
     const isBlocked = await isClientIpBlocked();
 
-    // Animate removal of preloader and manage UI visibility
     preloaderScreen.classList.add('hidden');
     await new Promise(resolve => setTimeout(resolve, 500)); 
     preloaderScreen.style.display = 'none';
@@ -659,12 +667,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return; // Stop execution
     }
     
-    // --- Access Granted: Load Dashboard ---
     dashboardWrapper.style.display = 'flex';
     loadStateFromStorage();
     renderSavedVideos();
     renderFollowedChannels();
-    restoreDropdownVideosFromStorage();
+    restoreDropdownVideosFromStorage(); // This now checks for stale data
 });
 
 // --- Modal ---
@@ -719,8 +726,8 @@ channelsList.addEventListener('click', (e) => {
     else if (sortSelect) {
          if (e.target === sortSelect) {
              const channelName = sortSelect.dataset.channelName;
-             const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
-             updateChannelDropdown(channelName, storedVideos, false); 
+             const storedData = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || { videos: [] };
+             updateChannelDropdown(channelName, storedData.videos, false); 
          }
     }
     else if (dropdownVideo) {
@@ -789,12 +796,30 @@ overlay.addEventListener('click', () => {
 });
 
 
-// Helper to restore videos from local storage into the dropdowns
+// --- UPDATED: Now checks for stale data on page load ---
 function restoreDropdownVideosFromStorage() {
     Object.keys(followedChannels).forEach(channelName => {
-        const storedVideos = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || [];
-        if (storedVideos.length > 0) {
-            updateChannelDropdown(channelName, storedVideos, false);
+        const storageKey = `videos-${channelName}`;
+        const storedDataJSON = localStorage.getItem(storageKey);
+        if (!storedDataJSON) return;
+
+        try {
+            const storedData = JSON.parse(storedDataJSON);
+            const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
+
+            // If data is older than 30 days, clear it and skip rendering
+            if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
+                localStorage.removeItem(storageKey);
+                console.log(`Cleared stale cache for ${channelName}.`);
+                return; 
+            }
+
+            if (storedData.videos && storedData.videos.length > 0) {
+                updateChannelDropdown(channelName, storedData.videos, false);
+            }
+        } catch (e) {
+            console.error(`Error parsing stored data for ${channelName}:`, e);
+            localStorage.removeItem(storageKey); // Clear corrupted data
         }
     });
 }
