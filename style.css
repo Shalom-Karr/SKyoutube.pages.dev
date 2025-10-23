@@ -373,11 +373,10 @@ input[type="text"]:focus, .styled-select:focus {
     }
 
     /* Adjust the main content and footer margins when the sidebar is expanded (DESKTOP ONLY) */
-    body:not(.sidebar-collapsed) .main-content,
-    body:not(.sidebar-collapsed) .footer-content {
-        margin-left: 500px;
-    }
-
+body:not(.sidebar-collapsed) .sidebar.channel-expanded ~ .main-content,
+body:not(.sidebar-collapsed) .sidebar.channel-expanded ~ .site-footer .footer-content {
+    margin-left: 500px;
+}
     /* Style for the channel row ONLY when the dropdown is open (DESKTOP ONLY) */
     .channel.dropdown-open .channel-info {
         flex-direction: column;
@@ -540,3 +539,4 @@ input[type="text"]:focus, .styled-select:focus {
         width: 100%;
     }
 }
+
