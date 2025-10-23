@@ -1,7 +1,6 @@
 // --- START OF FILE script.js ---
 
 // --- Supabase Configuration ---
-// Note: Supabase is still used for logging and IP checks.
 import { supabase } from './supabase-client.js';
 
 // --- CONFIGURATION ---
@@ -51,6 +50,7 @@ function showStatusMessage(message, type = 'success', duration = 4000) {
     if (statusMessage.timeoutId) clearTimeout(statusMessage.timeoutId);
     statusMessage.timeoutId = setTimeout(() => {
         statusMessage.classList.remove('show', 'success', 'error');
+        statusMessage.textContent = '';
     }, duration);
 }
 
@@ -93,32 +93,27 @@ async function isClientIpBlocked() {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
         const ipData = await ipResponse.json();
         clientIp = ipData.ip;
-
-        const { data: blockedIpsData, error } = await supabase.from('blocked_ips').select('ip_address');
+        const { data, error } = await supabase.from('blocked_ips').select('ip_address');
         if (error) {
             console.error("Error checking for blocked IP:", error);
             return false;
         }
-        const blockedIps = blockedIpsData.map(d => d.ip_address);
-        for (const blockedEntry of blockedIps) {
-            if (clientIp === blockedEntry) return true;
-            if (blockedEntry.split('.').length === 3 && clientIp.startsWith(blockedEntry + '.')) return true;
-        }
-        return false;
+        const blockedIps = data.map(d => d.ip_address);
+        return blockedIps.some(blocked => clientIp === blocked || (blocked.split('.').length === 3 && clientIp.startsWith(blocked + '.')));
     } catch (e) {
         console.error("Could not detect client IP address. Assuming non-blocked.", e);
         return false;
     }
 }
 
-async function logUserActivity(videoUrl, videoTitle) {
+async function logUserActivity(url, title) {
     if (clientIp === 'unknown') {
         try {
             const ipResponse = await fetch('https://api.ipify.org?format=json');
             clientIp = (await ipResponse.json()).ip;
-        } catch (e) { console.error("Could not detect client IP address for logging."); }
+        } catch (e) { console.error("Could not detect client IP for logging."); }
     }
-    const { error } = await supabase.from('user_logs').insert([{ video_url: videoUrl, video_title: videoTitle, ip_address: clientIp }]);
+    const { error } = await supabase.from('user_logs').insert([{ video_url: url, video_title: title, ip_address: clientIp }]);
     if (error) console.error("Error logging user activity:", error);
 }
 
@@ -170,9 +165,7 @@ function setAmbientColor(videoId) {
         try {
             const [r, g, b] = colorThief.getColor(thumbnailLoader);
             ambientBg.style.backgroundColor = `rgba(${r},${g},${b},0.5)`;
-        } catch (e) {
-            console.error("ColorThief error:", e);
-        }
+        } catch (e) { console.error("ColorThief error:", e); }
     };
 }
 async function updateVideoInfoInModal(videoId) {
@@ -186,12 +179,13 @@ async function updateVideoInfoInModal(videoId) {
             ytTitle.textContent = video.snippet.title;
             ytChannel.textContent = video.snippet.channelTitle;
             ytViews.textContent = `${parseInt(video.statistics.viewCount).toLocaleString()} views`;
-            ytDate.textContent = `Published on ${new Date(video.snippet.publishedAt).toLocaleDateString()}`;
+            ytDate.textContent = `Published on ${new Date(video.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`;
             modalVideoInfo.classList.add('visible');
         }
     } catch (e) {
         console.error("Error fetching video info:", e);
         ytTitle.textContent = 'Could not load video details.';
+        modalVideoInfo.classList.add('visible');
     }
 }
 
@@ -201,7 +195,9 @@ function renderSavedVideos(sortKey = 'date-added-desc') {
     savedVideoList.innerHTML = savedVideos.length === 0 ? '<p style="text-align:center; grid-column: 1 / -1;">No videos saved yet.</p>' : '';
     savedVideos.forEach((video, index) => {
         const youtubeId = getYouTubeVideoId(video.url);
-        const thumbnailUrl = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg` : `https://vumbnail.com/${getVimeoVideoId(video.url)}.jpg`;
+        const vimeoId = getVimeoVideoId(video.url);
+        if (!youtubeId && !vimeoId) return;
+        const thumbnailUrl = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg` : `https://vumbnail.com/${vimeoId}.jpg`;
         const item = document.createElement('div');
         item.className = 'video-item';
         item.innerHTML = `
@@ -210,7 +206,7 @@ function renderSavedVideos(sortKey = 'date-added-desc') {
                 <p class="video-item-title">${video.title || video.url}</p>
                 <div class="video-item-footer">
                     <span class="platform-badge platform-${youtubeId ? 'youtube' : 'vimeo'}">${youtubeId ? 'YouTube' : 'Vimeo'}</span>
-                    <button class="delete-btn material-icons" data-id="${video.id}">delete</button>
+                    <button class="delete-btn material-icons" data-id="${video.id}" title="Delete Video">delete</button>
                 </div>
             </div>`;
         item.style.animationDelay = `${index * 50}ms`;
@@ -219,11 +215,11 @@ function renderSavedVideos(sortKey = 'date-added-desc') {
     });
 }
 function sortSavedVideos(key) {
-    const compare = (a, b) => {
-        if (key.startsWith('title')) return a.title.localeCompare(b.title);
+    const compareFn = (a, b) => {
+        if (key.includes('title')) return a.title.localeCompare(b.title);
         return (a.dateAdded || 0) - (b.dateAdded || 0);
     };
-    savedVideos.sort(compare);
+    savedVideos.sort(compareFn);
     if (key.endsWith('desc')) savedVideos.reverse();
 }
 async function saveVideo(url, title = null) {
@@ -267,7 +263,6 @@ async function searchYouTube(query, type, resultsContainer) {
 }
 function renderVideoSearchResults(items, container) {
     items.forEach(item => {
-        const videoUrl = `https://www.youtube.com/watch?v=${item.id.videoId}`;
         const card = document.createElement('div');
         card.className = 'video-result-card';
         card.innerHTML = `
@@ -277,7 +272,7 @@ function renderVideoSearchResults(items, container) {
                 <div class="result-creator">${item.snippet.channelTitle}</div>
                 <div class="result-time">${timeAgo(new Date(item.snippet.publishedAt))}</div>
             </div>`;
-        card.onclick = () => saveVideo(videoUrl, item.snippet.title);
+        card.onclick = () => saveVideo(`https://www.youtube.com/watch?v=${item.id.videoId}`, item.snippet.title);
         container.appendChild(card);
     });
 }
@@ -346,152 +341,132 @@ function removeYoutubeChannel(internalName) {
     renderFollowedChannels();
     showStatusMessage(`Unfollowed ${channelData.displayName}`, 'success');
 }
-
-// --- NEW HELPER FUNCTION: Fetches and caches videos for a single channel ---
 async function fetchAndCacheChannelVideos(channelName, channelId) {
     const channelDiv = document.querySelector(`.channel[data-channel="${channelName}"]`);
     try {
         const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
         const videoIds = searchData.items.map(v => v.id.videoId).join(',');
         if (!videoIds) return [];
-
         const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
         const videos = detailsData.items.map(item => ({
-            id: item.id,
-            title: item.snippet.title,
-            thumbnail: item.snippet.thumbnails.medium.url,
-            publishedAt: item.snippet.publishedAt,
-            viewCount: parseInt(item.statistics.viewCount || 0),
+            id: item.id, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url,
+            publishedAt: item.snippet.publishedAt, viewCount: parseInt(item.statistics.viewCount || 0),
             duration: parseYTDuration(item.contentDetails.duration)
         }));
-
-        if (videos.length > 0) {
-            updateChannelDropdown(channelName, videos, true);
-        }
+        if (videos.length > 0) updateChannelDropdown(channelName, videos, true);
         if (channelDiv) {
             channelDiv.classList.add("highlight-green");
             channelDiv.addEventListener("animationend", () => channelDiv.classList.remove("highlight-green"), { once: true });
         }
     } catch (err) { console.error(`Error checking ${channelName}:`, err); }
 }
-
-// --- UPDATED: Now uses the helper function ---
 async function checkAllChannels() {
     checkVideosBtn.classList.add('loading');
-    document.querySelectorAll('.notification-dot').forEach(dot => dot.style.display = 'none');
-    const promises = Object.entries(followedChannels).map(([name, data]) => fetchAndCacheChannelVideos(name, data.id));
+    const promises = Object.values(followedChannels).map(data => fetchAndCacheChannelVideos(data.displayName.replace(/\s/g, ''), data.id));
     await Promise.all(promises);
     checkVideosBtn.classList.remove('loading');
 }
-
 function updateChannelDropdown(channelName, videos, merge = false) {
     const container = document.getElementById(`dropdown-${channelName}`);
     const notification = document.getElementById(`notif-${channelName}`);
     if (!container || !notification) return;
-
     const storageKey = `videos-${channelName}`;
-    let storedVideos = merge ? (JSON.parse(localStorage.getItem(storageKey))?.videos || []) : [];
-    
-    videos.forEach(video => {
-        if (!storedVideos.some(v => v.id === video.id)) storedVideos.push(video);
-    });
-
-    const dataToStore = { timestamp: Date.now(), videos: storedVideos };
+    let existingVideos = [];
+    if (merge) {
+        try { existingVideos = JSON.parse(localStorage.getItem(storageKey))?.videos || []; } 
+        catch (e) { console.error("Could not parse existing videos, starting fresh."); }
+    }
+    const newVideos = videos.filter(v => !existingVideos.some(ev => ev.id === v.id));
+    const allVideos = [...newVideos, ...existingVideos];
+    const dataToStore = { timestamp: Date.now(), videos: allVideos };
     localStorage.setItem(storageKey, JSON.stringify(dataToStore));
-
-    sortDropdownVideos(storedVideos, container.querySelector('.sort-dropdown')?.value || 'newest');
+    sortDropdownVideos(allVideos, container.querySelector('.sort-dropdown')?.value || 'newest');
     container.querySelectorAll('.dropdown-video').forEach(el => el.remove());
-
-    storedVideos.forEach(video => {
+    allVideos.forEach(video => {
         const isSaved = savedVideos.some(sv => getYouTubeVideoId(sv.url) === video.id);
-        const videoHTML = `
+        container.insertAdjacentHTML('beforeend', `
             <div class="dropdown-video" data-video-id="${video.id}" data-channel-name="${channelName}" data-title="${video.title}">
                 <img class="dropdown-thumbnail" src="${video.thumbnail}" alt="${video.title}">
                 <div class="dropdown-info">
                     <div class="dropdown-title">${video.title}</div>
                     <div class="dropdown-meta"><span>${formatViews(video.viewCount)} views</span> • <span>${timeAgo(new Date(video.publishedAt))}</span></div>
                 </div>
-                <div class="dropdown-actions"><span class="material-icons save-video-btn ${isSaved ? 'saved' : ''}">${isSaved ? 'bookmark_added' : 'bookmark_add'}</span></div>
-            </div>`;
-        container.insertAdjacentHTML('beforeend', videoHTML);
+                <div class="dropdown-actions"><span class="material-icons save-video-btn ${isSaved ? 'saved' : ''}" title="Save Video">${isSaved ? 'bookmark_added' : 'bookmark_add'}</span></div>
+            </div>`);
     });
-    notification.style.display = storedVideos.length > 0 ? 'block' : 'none';
+    notification.style.display = allVideos.length > 0 ? 'block' : 'none';
 }
 function sortDropdownVideos(videos, key) {
-    const compareFunctions = {
+    const SORTS = {
         'views': (a, b) => (b.viewCount || 0) - (a.viewCount || 0),
         'shortest': (a, b) => (a.duration || 0) - (b.duration || 0),
         'longest': (a, b) => (b.duration || 0) - (a.duration || 0),
-        'newest': (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)
+        'newest': (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt),
     };
-    videos.sort(compareFunctions[key] || compareFunctions['newest']);
+    videos.sort(SORTS[key] || SORTS['newest']);
 }
 async function handleDropdownVideoClick(videoElement) {
     const { videoId, title, channelName } = videoElement.dataset;
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
-    await saveVideo(url, title);
-    
+    await saveVideo(`https://www.youtube.com/watch?v=${videoId}`, title);
     const storageKey = `videos-${channelName}`;
-    const storedData = JSON.parse(localStorage.getItem(storageKey)) || { videos: [] };
-    storedData.videos = storedData.videos.filter(v => v.id !== videoId);
-    localStorage.setItem(storageKey, JSON.stringify(storedData));
-
-    videoElement.remove();
-    if (storedData.videos.length === 0) {
-        const notification = document.getElementById(`notif-${channelName}`);
-        if (notification) notification.style.display = 'none';
-    }
+    try {
+        const storedData = JSON.parse(localStorage.getItem(storageKey)) || { videos: [] };
+        storedData.videos = storedData.videos.filter(v => v.id !== videoId);
+        localStorage.setItem(storageKey, JSON.stringify(storedData));
+        videoElement.remove();
+        if (storedData.videos.length === 0) {
+            const notification = document.getElementById(`notif-${channelName}`);
+            if (notification) notification.style.display = 'none';
+        }
+    } catch (e) { console.error("Error updating dropdown cache after save:", e); }
 }
 
 // --- INITIALIZATION & EVENT LISTENERS ---
 document.addEventListener('DOMContentLoaded', async () => {
+    preloaderScreen.classList.add('hidden');
     if (await isClientIpBlocked()) {
-        preloaderScreen.classList.add('hidden');
         accessDeniedScreen.classList.add('visible');
         return;
     }
-    preloaderScreen.classList.add('hidden');
     dashboardWrapper.style.display = 'flex';
     loadStateFromStorage();
     renderSavedVideos();
     renderFollowedChannels();
     restoreDropdownVideosFromStorage();
 });
-
 closeModalBtn.addEventListener('click', closePlayer);
-videoModal.addEventListener('click', (e) => e.target === videoModal && closePlayer());
-sortSavedVideosSelect.addEventListener('change', (e) => renderSavedVideos(e.target.value));
-savedVideoList.addEventListener('click', (e) => {
-    const deleteBtn = e.target.closest('.delete-btn');
-    const thumbnail = e.target.closest('.video-item-thumbnail');
-    if (deleteBtn && confirm('Are you sure you want to delete this video?')) deleteVideo(deleteBtn.dataset.id);
-    if (thumbnail?.dataset.youtubeId) playVideoInModal(thumbnail.dataset.youtubeId);
+videoModal.addEventListener('click', e => e.target === videoModal && closePlayer());
+sortSavedVideosSelect.addEventListener('change', e => renderSavedVideos(e.target.value));
+savedVideoList.addEventListener('click', e => {
+    if (e.target.closest('.delete-btn')) {
+        if (confirm('Are you sure you want to delete this video?')) deleteVideo(e.target.closest('.delete-btn').dataset.id);
+    } else if (e.target.closest('.video-item-thumbnail')?.dataset.youtubeId) {
+        playVideoInModal(e.target.closest('.video-item-thumbnail').dataset.youtubeId);
+    }
 });
-
 expandSidebarBtn.addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
     body.classList.toggle('sidebar-collapsed');
     expandSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? 'chevron_right' : 'chevron_left';
 });
 checkVideosBtn.addEventListener('click', checkAllChannels);
-channelsList.addEventListener('click', (e) => {
+channelsList.addEventListener('click', e => {
     const channelInfo = e.target.closest('.channel-info');
     const dropdownVideo = e.target.closest('.dropdown-video');
     const saveBtn = e.target.closest('.save-video-btn');
     const sortSelect = e.target.closest('.sort-dropdown');
-
-    if (channelInfo) channelInfo.parentElement.classList.toggle('dropdown-open');
-    else if (dropdownVideo && !saveBtn) handleDropdownVideoClick(dropdownVideo);
-    else if (saveBtn && !saveBtn.classList.contains('saved')) {
+    if (channelInfo) {
+        channelInfo.parentElement.classList.toggle('dropdown-open');
+    } else if (dropdownVideo && !saveBtn) {
+        handleDropdownVideoClick(dropdownVideo);
+    } else if (saveBtn && !saveBtn.classList.contains('saved')) {
         e.stopPropagation();
         handleDropdownVideoClick(saveBtn.closest('.dropdown-video'));
     } else if (sortSelect) {
-        const channelName = sortSelect.dataset.channelName;
-        const storedData = JSON.parse(localStorage.getItem(`videos-${channelName}`)) || { videos: [] };
-        updateChannelDropdown(channelName, storedData.videos, false);
+        const storedData = JSON.parse(localStorage.getItem(`videos-${sortSelect.dataset.channelName}`)) || { videos: [] };
+        updateChannelDropdown(sortSelect.dataset.channelName, storedData.videos, false);
     }
 });
-
 document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     if (getYouTubeVideoId(input.value) || getVimeoVideoId(input.value)) {
@@ -514,7 +489,6 @@ document.getElementById('channel-search-button').addEventListener('click', () =>
         if (e.key === 'Enter') e.target.nextElementSibling.click();
     });
 });
-
 const togglePanel = (panel, isOpen) => {
     panel.classList.toggle('mobile-open', isOpen);
     overlay.classList.toggle('visible', isOpen);
@@ -529,32 +503,33 @@ overlay.addEventListener('click', () => {
     togglePanel(sidebar, false);
     togglePanel(actionPanel, false);
 });
-
-// --- UPDATED: Automatically fetches fresh data for stale channels on page load ---
+// --- FINAL VERSION: Restores cache, auto-refreshes stale data, and fetches if no cache exists. ---
 function restoreDropdownVideosFromStorage() {
     Object.entries(followedChannels).forEach(([channelName, channelData]) => {
         const storageKey = `videos-${channelName}`;
         const storedDataJSON = localStorage.getItem(storageKey);
-        
-        if (!storedDataJSON) { // No cache, fetch new data
+        // If no cache exists, fetch immediately.
+        if (!storedDataJSON) {
+            console.log(`No cache for ${channelName}. Fetching initial data...`);
             fetchAndCacheChannelVideos(channelName, channelData.id);
             return;
         }
-
         try {
             const storedData = JSON.parse(storedDataJSON);
             const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
-
+            // If cache is stale (older than 30 days), fetch new data.
             if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
                 console.log(`Cache for ${channelName} is stale. Auto-refreshing...`);
-                fetchAndCacheChannelVideos(channelName, channelData.id); // Fetch new data
-            } else if (storedData.videos && storedData.videos.length > 0) {
-                updateChannelDropdown(channelName, storedData.videos, false); // Use fresh cache
+                fetchAndCacheChannelVideos(channelName, channelData.id);
+            } 
+            // Otherwise, if cache is fresh and has videos, display them.
+            else if (storedData.videos && storedData.videos.length > 0) {
+                updateChannelDropdown(channelName, storedData.videos, false);
             }
         } catch (e) {
-            console.error(`Clearing corrupted data for ${channelName}:`, e);
+            console.error(`Clearing corrupted data for ${channelName} and re-fetching:`, e);
             localStorage.removeItem(storageKey);
-            fetchAndCacheChannelVideos(channelName, channelData.id); // Fetch new data
+            fetchAndCacheChannelVideos(channelName, channelData.id); // Re-fetch on error
         }
     });
 }
