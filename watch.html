@@ -11,6 +11,8 @@
         :root {
             --bg-color: #0f0f0f;
             --surface-1: #161616;
+            --surface-2: #272727;
+            --surface-3: #3a3a3a;
             --text-primary: #f1f1f1;
             --text-secondary: #aaa;
             --accent-color: #3ea6ff;
@@ -50,8 +52,12 @@
         h2 { font-size: 1.4em; }
         p, li { color: var(--text-secondary); }
         ol { padding-left: 20px; }
-        li { margin-bottom: 10px; }
-        a.button {
+        li { margin-bottom: 15px; }
+        a { color: var(--accent-color); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        strong { color: var(--text-primary); font-weight: 500; }
+
+        .button {
             display: inline-block;
             background-color: var(--accent-color);
             color: white;
@@ -63,10 +69,27 @@
             transition: filter 0.2s;
             margin-top: 10px;
         }
-        a.button:hover { filter: brightness(1.15); }
-        a { color: var(--accent-color); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        strong { color: var(--text-primary); font-weight: 500; }
+        .button:hover { filter: brightness(1.15); }
+
+        .browser-links {
+            margin-top: 10px;
+        }
+        .browser-link {
+            display: inline-block;
+            background-color: var(--surface-2);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            margin: 5px 5px 5px 0;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 0.9em;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .browser-link:hover {
+            background-color: var(--surface-3);
+            border-color: var(--accent-color);
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -76,13 +99,21 @@
         
         <h2>Installation Instructions</h2>
         <ol>
-            <li>If you haven't already, install the <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener noreferrer">Tampermonkey</a> browser extension.</li>
-            <li>Click the button below. Tampermonkey will open a new tab asking you to confirm the installation.</li>
+            <li>
+                Install the <strong>Tampermonkey</strong> extension for your browser:
+                <div class="browser-links">
+                    <a href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" class="browser-link" target="_blank" rel="noopener noreferrer">Chrome</a>
+                    <a href="https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd" class="browser-link" target="_blank" rel="noopener noreferrer">Edge</a>
+                    <a href="https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/" class="browser-link" target="_blank" rel="noopener noreferrer">Firefox</a>
+                    <a href="https://www.tampermonkey.net/" class="browser-link" target="_blank" rel="noopener noreferrer">Other Browsers</a>
+                </div>
+            </li>
+            <li>Click the button below. A new tab will open asking you to confirm the script installation.</li>
             <li>Click "Install" in the Tampermonkey tab. The script will now be active and will update automatically!</li>
         </ol>
         
         <a href="https://raw.githubusercontent.com/Shalom-Karr/youtube-redirector/main/youtube-redirector.user.js" class="button" target="_blank">
-            Install Script via Tampermonkey
+            Install Redirector Script
         </a>
 
         <h2>How It Works</h2>
