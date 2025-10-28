@@ -187,6 +187,7 @@ async function updateVideoInfoInModal(videoId) {
             ytViews.textContent = `${parseInt(video.statistics.viewCount).toLocaleString()} views`;
             ytDate.textContent = `Published on ${new Date(video.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`;
             modalVideoInfo.classList.add('visible');
+            logUserActivity(`https://www.youtube.com/watch?v=${videoId}`, video.snippet.title);            
         }
     } catch (e) {
         console.error("Error fetching video info:", e);
@@ -562,3 +563,4 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
+
