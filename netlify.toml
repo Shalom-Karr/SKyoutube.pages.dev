@@ -8,3 +8,8 @@
 [functions]
   # It's good practice to specify the Node.js version for consistency.
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/video"
+  to = "/index.html"
+  status = 200

@@ -438,6 +438,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderSavedVideos();
     renderFollowedChannels();
     restoreDropdownVideosFromStorage();
+
+    // Check for video source in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoSource = urlParams.get('source');
+    if (videoSource) {
+        playVideoInModal(videoSource);
+    }
 });
 closeModalBtn.addEventListener('click', closePlayer);
 videoModal.addEventListener('click', e => e.target === videoModal && closePlayer());
