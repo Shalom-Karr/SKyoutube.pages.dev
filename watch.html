@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install My Tampermonkey Script</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        h1 { color: #333; }
+        p { margin: 10px 0; }
+        pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Install My Tampermonkey Script</h1>
+    
+    <p>This page guides you through installing my custom Tampermonkey script. Follow the steps below to get started:</p>
+    
+    <h2>Installation Instructions</h2>
+    <ol>
+        <li><a href="https://www.tampermonkey.net/" target="_blank">Install Tampermonkey</a> extension for your browser if you haven't already.</li>
+        <li>Click the button below to install the script:</li>
+        <button onclick="installScript()">Install Script</button>
+    </ol>
+    
+    <h2>Script Description</h2>
+    <p>Your script helps by automating redirection from filtered YouTube links, allowing easy access to videos with improved settings.</p>
+    
+    <h2>Developer Permissions</h2>
+    <p>To allow full script functionality, you need to:</p>
+    <ul>
+        <li>Enable the script within the Tampermonkey dashboard after installation.</li>
+        <li>Provide the necessary site permissions, primarily on the pages where the script needs to run.</li>
+    </ul>
+    
+    <h2>Script Code</h2>
+    <pre>
+// ==UserScript==
+// @name         YouTube Redirector
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Redirect from filter page to custom site with YouTube video ID
+// @author       You
+// @match        *://filter.techloq.com/block-page*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    // Script logic here...
+})();
+    </pre>
+
+    <script>
+        function installScript() {
+            const scriptContent = `// ==UserScript==
+// @name         YouTube Redirector
+// @namespace    http://tampermonkey.net/
+// @version      0.1
+// @description  Redirect from filter page to custom site with YouTube video ID
+// @author       You
+// @match        *://filter.techloq.com/block-page*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    // Script logic here...
+})();`;
+
+            const blob = new Blob([scriptContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'youtube-redirector.user.js';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
