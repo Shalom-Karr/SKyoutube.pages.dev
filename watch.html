@@ -51,29 +51,19 @@
         p, li { color: var(--text-secondary); }
         ol { padding-left: 20px; }
         li { margin-bottom: 10px; }
-        pre {
-            background-color: #0d1117;
-            padding: 15px;
-            border-radius: var(--border-radius);
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-family: 'Courier New', Courier, monospace;
-            border: 1px solid var(--border-color);
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        button {
+        a.button {
+            display: inline-block;
             background-color: var(--accent-color);
             color: white;
-            padding: 10px 20px;
-            border: none;
+            padding: 12px 24px;
             border-radius: var(--border-radius);
-            cursor: pointer;
+            text-decoration: none;
             font-size: 16px;
             font-weight: 500;
             transition: filter 0.2s;
+            margin-top: 10px;
         }
-        button:hover { filter: brightness(1.15); }
+        a.button:hover { filter: brightness(1.15); }
         a { color: var(--accent-color); text-decoration: none; }
         a:hover { text-decoration: underline; }
         strong { color: var(--text-primary); font-weight: 500; }
@@ -82,97 +72,25 @@
 <body>
     <div class="container">
         <h1>Install the YouTube Redirector Script</h1>
-        
-        <p>This page provides an easy way to install a custom script that improves your viewing experience when encountering filtered content.</p>
+        <p>This page provides a one-click installation for the script that improves your viewing experience when encountering filtered content.</p>
         
         <h2>Installation Instructions</h2>
         <ol>
             <li>If you haven't already, install the <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener noreferrer">Tampermonkey</a> browser extension.</li>
             <li>Click the button below. Tampermonkey will open a new tab asking you to confirm the installation.</li>
-            <li><button onclick="installScript()">Install Script</button></li>
-            <li>Click "Install" in the Tampermonkey tab. The script is now active!</li>
+            <li>Click "Install" in the Tampermonkey tab. The script will now be active and will update automatically!</li>
         </ol>
         
-        <h2>Script Description</h2>
+        <a href="https://raw.githubusercontent.com/Shalom-Karr/youtube-redirector/main/youtube-redirector.user.js" class="button" target="_blank">
+            Install Script via Tampermonkey
+        </a>
+
+        <h2>How It Works</h2>
         <p>
             When you try to access a YouTube video and are blocked by a <strong>Techloq filter page</strong>, this script automatically detects the YouTube link.
             It then seamlessly redirects you to the SK Video Dashboard with the video ready to play, bypassing the block.
         </p>
-        
-        <h2>Script Code</h2>
-        <pre id="script-code-display"></pre>
 
     </div>
-
-    <script>
-        const scriptContent = `// ==UserScript==
-// @name         YouTube Redirector
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Redirect from filter page to custom site with YouTube video ID
-// @author       You
-// @match        *://filter.techloq.com/block-page*
-// @grant        none
-// ==/UserScript==
-
-(function() {
-    'use strict';
-    // Only proceed if URL contains "youtube"
-
-    if (window.top !== window.self) {
-        // We're inside an iframe — stop here.
-        return;
-    }
-
-    setTimeout(() => {
-        console.log('checking if youtube');
-        if (!window.location.href.toLowerCase().includes("youtube")) return;
-        console.log('yep');
-
-        // Wait for the page to load
-        const blockDiv = document.querySelector('div.block-url');
-        if (blockDiv) {
-            const link = blockDiv.querySelector('a');
-            if (link && link.href) {
-                function getYouTubeID(url) {
-                    const pattern = /(?:youtube\\.com\\/(?:watch\\?v=|embed\\/|v\\/)|youtu\\.be\\/)([a-zA-Z0-9_-]{11})/;
-                    const match = url.match(pattern);
-                    return match ? match[1] : null;
-                }
-                const videoID = getYouTubeID(link.href);
-
-                if (videoID) {
-                    const encodedVideoID = encodeURIComponent(videoID);
-                    window.location.href = 'https://skyoutube.pages.dev/video?source=' + encodedVideoID;
-                } else {
-                    console.log("No valid YouTube video ID found.");
-                }
-            } else {
-                console.log("No <a> found inside .block-url div.");
-            }
-        } else {
-            console.log("No .block-url div found.");
-        }
-    }, 1000);
-})();`;
-
-        // Populate the <pre> tag with the script content for display
-        document.getElementById('script-code-display').textContent = scriptContent;
-
-        function installScript() {
-            // Tampermonkey expects a `.user.js` file to trigger installation
-            const blob = new Blob([scriptContent], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'youtube-redirector.user.js';
-            document.body.appendChild(a); // Required for Firefox
-            a.click();
-            document.body.removeChild(a);
-
-            // Clean up the object URL
-            URL.revokeObjectURL(url);
-        }
-    </script>
 </body>
 </html>
