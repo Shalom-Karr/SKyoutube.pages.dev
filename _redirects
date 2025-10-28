@@ -1,0 +1,5 @@
+# _redirects
+
+# This rule rewrites requests for /video to serve the main index.html file,
+# which is ideal for Single-Page Applications (SPAs).
+/video    /index.html   200
