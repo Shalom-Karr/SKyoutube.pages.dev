@@ -91,6 +91,13 @@
             border-color: var(--accent-color);
             text-decoration: none;
         }
+        code {
+            background-color: var(--surface-2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: var(--text-primary);
+        }
 
         /* --- FOOTER STYLES --- */
         .site-footer {
@@ -143,6 +150,31 @@
             When you try to access a YouTube video and are blocked by a <strong>Techloq filter page</strong>, this script automatically detects the YouTube link.
             It then seamlessly redirects you to the SK Video Dashboard with the video ready to play, bypassing the block.
         </p>
+
+        <!-- === NEW SECTION STARTS HERE === -->
+        <h2>Troubleshooting: Script Not Working?</h2>
+        <p>
+            If the script does not run automatically after installation, you may need to enable a specific permission for Tampermonkey. Follow these steps:
+        </p>
+        <ol>
+            <li>
+                <strong>Open Tampermonkey's settings page.</strong> You can use this direct link for Chrome/Edge:
+                <br>
+                <a href="chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer">chrome://extensions/?id=dhdgffkkebhmkfjojejmpbldmpobfkfo</a>
+            </li>
+            <li>
+                <strong>Find the "Allow User Scripts" option.</strong> This setting allows the extension to run custom code, like the redirector script.
+            </li>
+            <li>
+                <strong>Enable the setting.</strong> Click the toggle switch next to "Allow User Scripts" to turn it on. It should look like this:
+                <img src="https://i.imgur.com/Gz7qg5e.png" alt="Allow User Scripts toggle enabled" style="max-width: 100%; border-radius: 6px; margin-top: 10px; border: 1px solid var(--border-color);">
+            </li>
+        </ol>
+        <p>
+            Once enabled, the script should work correctly. You do not need to reinstall it.
+        </p>
+        <!-- === NEW SECTION ENDS HERE === -->
+
     </div>
 
     <footer class="site-footer">
