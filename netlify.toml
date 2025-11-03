@@ -13,3 +13,8 @@
   from = "/video"
   to = "/index.html"
   status = 200
+
+[[redirects]]
+  from = "/playlist"
+  to = "/index.html"
+  status = 200
