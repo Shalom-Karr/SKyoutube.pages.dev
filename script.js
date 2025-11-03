@@ -128,7 +128,7 @@ function saveChannelsToStorage() { localStorage.setItem('followedChannels', JSON
 
 // --- API CALLS ---
 async function fetchWithKeyRotation(pathAndParams) {
-    const endpoint = pathAndParams.match(/^([a-z]+)/)?.[1];
+    const endpoint = pathAndParams.match(/^([a-zA-Z]+)/)?.[1];
     if (!endpoint) throw new Error("Invalid API path provided to proxy.");
     const params = pathAndParams.match(/\?(.*)/)?.[1] || '';
     const hostname = window.location.hostname;
