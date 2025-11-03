@@ -325,6 +325,7 @@ function renderFollowedChannels() {
                 <span class="expandChannel material-icons">${icon}</span>
                 <img src="${data.thumbnailUrl}" alt="${data.displayName}">
                 <span class="creator">${data.displayName}</span>
+                <button class="remove-btn material-icons" data-internal-name="${internalName}" title="Remove">close</button>
                 ${!isPlaylist ? `<span class="notification-dot" id="notif-${internalName}" style="display: none;"></span>` : ''}
             </div>
             <div class="video-dropdown" id="dropdown-${internalName}">
@@ -416,10 +417,14 @@ function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
 function removeYoutubeChannel(internalName) {
     const channelData = followedChannels[internalName];
     if (!channelData) return;
+
+    const isPlaylist = channelData.type === 'playlist';
+    const message = isPlaylist ? `Playlist "${channelData.displayName}" removed.` : `Unfollowed ${channelData.displayName}.`;
+
     delete followedChannels[internalName];
     saveChannelsToStorage();
     renderFollowedChannels();
-    showStatusMessage(`Unfollowed ${channelData.displayName}`, 'success');
+    showStatusMessage(message, 'success');
 }
 async function fetchAndCacheChannelVideos(channelName, channelId) {
     const channelDiv = document.querySelector(`.channel[data-channel="${channelName}"]`);
@@ -539,6 +544,15 @@ expandSidebarBtn.addEventListener('click', () => {
 });
 checkVideosBtn.addEventListener('click', checkAllChannels);
 channelsList.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+        const internalName = removeBtn.dataset.internalName;
+        if (internalName) {
+            removeYoutubeChannel(internalName);
+        }
+        return; // Stop further processing
+    }
+
     const channelInfo = e.target.closest('.channel-info');
     const dropdownVideo = e.target.closest('.dropdown-video');
     const sortSelect = e.target.closest('.sort-dropdown');
