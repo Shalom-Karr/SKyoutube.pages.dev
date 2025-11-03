@@ -57,6 +57,7 @@ function showStatusMessage(message, type = 'success', duration = 4000) {
 // --- HELPER FUNCTIONS ---
 const getYouTubeVideoId = (url) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)?. [1] || null;
 const getVimeoVideoId = (url) => url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/)?.[1] || null;
+const getPlaylistId = (url) => url.match(/[?&]list=([a-zA-Z0-9_-]+)/)?.[1] || null;
 
 function parseYTDuration(iso) {
     const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
@@ -310,28 +311,100 @@ function renderChannelSearchResults(items, container) {
 // --- SIDEBAR LOGIC ---
 function renderFollowedChannels() {
     channelsList.innerHTML = '';
-    Object.entries(followedChannels).forEach(([internalName, channelData]) => {
-        const channelDiv = document.createElement('div');
-        channelDiv.className = 'channel';
-        channelDiv.dataset.channel = internalName;
-        channelDiv.innerHTML = `
+    Object.entries(followedChannels).forEach(([internalName, data]) => {
+        const isPlaylist = data.type === 'playlist';
+        const elementDiv = document.createElement('div');
+        elementDiv.className = 'channel'; // Using 'channel' class for consistent styling
+        elementDiv.dataset.channel = internalName;
+
+        // Use a different icon for playlists
+        const icon = isPlaylist ? 'playlist_play' : 'expand_more';
+
+        elementDiv.innerHTML = `
             <div class="channel-info" data-name="${internalName}">
-                <span class="expandChannel material-icons">expand_more</span>
-                <img src="${channelData.thumbnailUrl}" alt="${channelData.displayName}">
-                <span class="creator">${channelData.displayName}</span>
-                <span class="notification-dot" id="notif-${internalName}" style="display: none;"></span>
+                <span class="expandChannel material-icons">${icon}</span>
+                <img src="${data.thumbnailUrl}" alt="${data.displayName}">
+                <span class="creator">${data.displayName}</span>
+                ${!isPlaylist ? `<span class="notification-dot" id="notif-${internalName}" style="display: none;"></span>` : ''}
             </div>
             <div class="video-dropdown" id="dropdown-${internalName}">
+                ${!isPlaylist ? `
                 <div class="dropdown-controls">
                      <select class="sort-dropdown styled-select" data-channel-name="${internalName}">
                         <option value="newest">Newest</option><option value="views">Most Views</option>
                         <option value="shortest">Shortest</option><option value="longest">Longest</option>
                     </select>
-                </div>
+                </div>` : ''}
             </div>`;
-        channelsList.appendChild(channelDiv);
+        channelsList.appendChild(elementDiv);
+
+        // If it's a playlist, render its videos immediately since they are already fetched
+        if (isPlaylist && data.videos) {
+            const container = document.getElementById(`dropdown-${internalName}`);
+            data.videos.forEach(video => {
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="dropdown-video" data-video-id="${video.id}" data-channel-name="${internalName}" data-title="${video.title}">
+                        <img class="dropdown-thumbnail" src="${video.thumbnail}" alt="${video.title}">
+                        <div class="dropdown-info">
+                            <div class="dropdown-title">${video.title}</div>
+                             <div class="dropdown-meta"><span>${timeAgo(new Date(video.publishedAt))}</span></div>
+                        </div>
+                    </div>`);
+            });
+        }
     });
 }
+async function addPlaylistById(playlistId) {
+    if (!playlistId) return;
+
+    // Check if the playlist is already followed to avoid duplicates
+    const isAlreadyFollowed = Object.values(followedChannels).some(c => c.id === playlistId && c.type === 'playlist');
+    if (isAlreadyFollowed) {
+        showStatusMessage('This playlist is already in your following list.', 'error');
+        return;
+    }
+
+    try {
+        // 1. Fetch playlist details (for the title)
+        const playlistData = await fetchWithKeyRotation(`playlists?part=snippet&id=${playlistId}`);
+        if (!playlistData.items || playlistData.items.length === 0) {
+            throw new Error("Playlist not found or is private.");
+        }
+        const playlistTitle = playlistData.items[0].snippet.title;
+        const playlistThumbnail = playlistData.items[0].snippet.thumbnails.medium.url;
+
+        // 2. Fetch playlist items (the videos)
+        const videoData = await fetchWithKeyRotation(`playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`);
+        const videos = videoData.items.map(item => ({
+            id: item.snippet.resourceId.videoId,
+            title: item.snippet.title,
+            thumbnail: item.snippet.thumbnails.medium.url,
+            publishedAt: item.snippet.publishedAt,
+            viewCount: 0, // Note: playlistItems endpoint doesn't provide view counts
+            duration: 0 // Note: playlistItems endpoint doesn't provide duration
+        }));
+
+        // 3. Add to our local state (re-using the 'followedChannels' structure for simplicity)
+        const internalName = `playlist_${playlistId}`;
+        followedChannels[internalName] = {
+            id: playlistId,
+            displayName: playlistTitle,
+            thumbnailUrl: playlistThumbnail,
+            type: 'playlist', // Differentiate from channels
+            videos: videos // Store videos directly
+        };
+
+        saveChannelsToStorage();
+        renderFollowedChannels(); // Re-render the sidebar
+        showStatusMessage(`Playlist "${playlistTitle}" added successfully!`, 'success');
+        logUserActivity(`https://www.youtube.com/playlist?list=${playlistId}`, `Followed Playlist: ${playlistTitle}`);
+
+    } catch (error) {
+        console.error("Error adding playlist:", error);
+        showStatusMessage(`Failed to add playlist: ${error.message}`, 'error');
+    }
+}
+
 function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
     if (followedChannels[internalName]) return;
     followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl };
@@ -440,11 +513,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderFollowedChannels();
     restoreDropdownVideosFromStorage();
 
-    // Check for video source in URL
+    // Check for video or playlist source in URL
     const urlParams = new URLSearchParams(window.location.search);
     const videoSource = urlParams.get('source');
-    if (videoSource) {
+    if (window.location.pathname.includes('/video') && videoSource) {
         playVideoInModal(videoSource);
+    } else if (window.location.pathname.includes('/playlist') && videoSource) {
+        addPlaylistById(videoSource);
     }
 });
 closeModalBtn.addEventListener('click', closePlayer);
@@ -503,11 +578,17 @@ actionTabs.forEach(tab => {
 });
 document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
-    if (getYouTubeVideoId(input.value) || getVimeoVideoId(input.value)) {
-        await saveVideo(input.value.trim());
+    const url = input.value.trim();
+    const playlistId = getPlaylistId(url);
+
+    if (playlistId) {
+        await addPlaylistById(playlistId);
+        input.value = '';
+    } else if (getYouTubeVideoId(url) || getVimeoVideoId(url)) {
+        await saveVideo(url);
         input.value = '';
     } else {
-        showStatusMessage("Please enter a valid YouTube or Vimeo URL.", "error");
+        showStatusMessage("Please enter a valid YouTube video, Vimeo video, or YouTube playlist URL.", "error");
     }
 });
 document.getElementById('video-search-button').addEventListener('click', () => {
@@ -539,6 +620,11 @@ overlay.addEventListener('click', () => {
 });
 function restoreDropdownVideosFromStorage() {
     Object.entries(followedChannels).forEach(([channelName, channelData]) => {
+        // If it's a playlist, we don't need to do anything here as the videos are stored with the playlist object itself.
+        if (channelData.type === 'playlist') {
+            return;
+        }
+
         const storageKey = `videos-${channelName}`;
         const storedDataJSON = localStorage.getItem(storageKey);
         if (!storedDataJSON) {
