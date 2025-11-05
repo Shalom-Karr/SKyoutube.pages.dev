@@ -406,6 +406,32 @@ async function addPlaylistById(playlistId) {
     }
 }
 
+async function addChannelByHandle(handle) {
+    if (!handle) return;
+
+    try {
+        const channelData = await fetchWithKeyRotation(`channels?part=snippet&forHandle=${handle}`);
+        if (!channelData.items || channelData.items.length === 0) {
+            throw new Error("Channel handle not found.");
+        }
+        const { id, snippet } = channelData.items[0];
+        const { title, thumbnails } = snippet;
+        const internalName = title.replace(/\s/g, '');
+
+        if (followedChannels[internalName]) {
+            showStatusMessage(`You are already following ${title}.`, 'info');
+            return;
+        }
+
+        addYoutubeChannel(internalName, title, id, thumbnails.medium.url);
+        logUserActivity(`https://www.youtube.com/handle/@${handle}`, `Followed Channel by Handle: ${title}`);
+
+    } catch (error) {
+        console.error("Error adding channel by handle:", error);
+        showStatusMessage(`Failed to follow channel: ${error.message}`, 'error');
+    }
+}
+
 function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
     if (followedChannels[internalName]) return;
     followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl };
@@ -525,6 +551,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         playVideoInModal(videoSource);
     } else if (window.location.pathname.includes('/playlist') && videoSource) {
         addPlaylistById(videoSource);
+    } else if (urlParams.has('channel_source')) {
+        const channelHandle = urlParams.get('channel_source');
+        addChannelByHandle(channelHandle);
     }
 });
 closeModalBtn.addEventListener('click', closePlayer);
