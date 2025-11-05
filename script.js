@@ -547,13 +547,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check for video or playlist source in URL
     const urlParams = new URLSearchParams(window.location.search);
     const videoSource = urlParams.get('source');
+    const channelSource = urlParams.get('channel_source');
     if (window.location.pathname.includes('/video') && videoSource) {
         playVideoInModal(videoSource);
     } else if (window.location.pathname.includes('/playlist') && videoSource) {
         addPlaylistById(videoSource);
-    } else if (urlParams.has('channel_source')) {
-        const channelHandle = urlParams.get('channel_source');
-        addChannelByHandle(channelHandle);
+    } else if (window.location.pathname.includes('/channel') && videoSource) {
+        addChannelByHandle(videoSource);
+    } else if (channelSource) {
+        addChannelByHandle(channelSource);
     }
 });
 closeModalBtn.addEventListener('click', closePlayer);
