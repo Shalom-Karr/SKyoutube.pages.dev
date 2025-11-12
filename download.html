@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SK Video Dashboard</title>
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
+
+    <!-- Local Files -->
+    <style>
+/* --- GLOBAL & LAYOUT --- */
+:root {
+    --bg-color: #0f0f0f;
+    --surface-1: #161616;
+    --surface-2: #272727;
+    --surface-3: #3a3a3a;
+    --text-primary: #f1f1f1;
+    --text-secondary: #aaa;
+    --accent-color: #3ea6ff;
+    --accent-glow: rgba(62, 166, 255, 0.3);
+    --red-color: #ff4d4d;
+    --green-color: #28a745;
+    --border-color: #303030;
+    --transition-speed: 0.3s;
+    --border-radius: 8px;
+    --sidebar-width: 360px; /* Increased default width */
+    --actions-width: 360px;
+    --footer-height: 80px;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --cubic-bezier: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    background: linear-gradient(135deg, #0d1117, #1a1a2e, #16213e);
+    background-size: 400% 400%;
+    animation: gradientBG 25s ease infinite;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-bottom: var(--footer-height);
+}
+
+#dashboard-wrapper {
+    display: none;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+h1, h2, h3 { font-weight: 600; }
+h2 { text-align: center; }
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--surface-1); }
+::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; border: 2px solid var(--surface-1); }
+::-webkit-scrollbar-thumb:hover { background: #777; }
+
+/* --- GLOBAL TRANSITIONS --- */
+/* Apply smooth transitions to layout-shifting elements globally */
+.sidebar, .main-content, .footer-content {
+    transition: width 0.4s var(--cubic-bezier), margin-left 0.4s var(--cubic-bezier), transform 0.4s var(--cubic-bezier);
+}
+
+/* --- LAYOUT STRUCTURE (DESKTOP) --- */
+.sidebar, .action-panel {
+    position: fixed;
+    top: 0;
+    height: 100vh;
+    background-color: var(--surface-1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
+    padding: 20px;
+    z-index: 10;
+}
+.sidebar {
+    width: var(--sidebar-width);
+    left: 0;
+    border-right: 1px solid var(--border-color);
+}
+.sidebar.collapsed { transform: translateX(-100%); }
+
+.action-panel {
+    width: var(--actions-width);
+    right: 0;
+    border-left: 1px solid var(--border-color);
+}
+
+.main-content {
+    width: auto;
+    flex-grow: 1;
+    padding: 25px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-left: var(--sidebar-width);
+    margin-right: var(--actions-width);
+    min-height: calc(100vh - var(--footer-height));
+}
+
+/* --- UI Elements & Effects --- */
+.icon-btn {
+    font-family: 'Material Icons'; font-size: 28px; cursor: pointer;
+    padding: 5px; border-radius: 50%; transition: background-color 0.2s, transform 0.5s; user-select: none;
+}
+.icon-btn:hover { background-color: var(--surface-2); }
+.icon-btn.loading { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+button {
+    padding: 0.7rem 1.2rem; color: #fff; border: none; cursor: pointer;
+    font-weight: 500; border-radius: var(--border-radius);
+    transition: all var(--transition-speed) ease;
+    background-color: var(--accent-color);
+    font-family: var(--font-family); font-size: 0.95rem;
+}
+button:hover { filter: brightness(1.2); transform: translateY(-2px); }
+button:active { filter: brightness(0.9); transform: translateY(0); }
+
+input[type="text"], .styled-select {
+    width: 100%; padding: 10px 12px; font-size: 1rem;
+    border: 1px solid var(--border-color); border-radius: var(--border-radius);
+    background-color: var(--surface-2); color: var(--text-primary);
+    outline: none; font-family: var(--font-family);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+input[type="text"]:focus, .styled-select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.styled-select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23aaa' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; }
+
+.loader {
+    width: 48px; height: 48px; border: 3px solid var(--text-secondary);
+    border-radius: 50%; display: inline-block;
+    position: relative; box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+    margin: 20px auto;
+}
+.loader::after {
+    content: ''; box-sizing: border-box; position: absolute;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 56px; height: 56px; border-radius: 50%;
+    border: 3px solid; border-color: var(--accent-color) transparent;
+}
+@keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* --- Status Message Styles --- */
+#status-message {
+    width: 100%; max-width: 900px; padding: 10px 15px; margin-bottom: 20px;
+    border-radius: var(--border-radius); text-align: center; font-weight: 500;
+    opacity: 0; transition: opacity 0.3s ease, background-color 0.3s ease;
+    height: 0; overflow: hidden;
+}
+#status-message.show { opacity: 1; height: auto; min-height: 40px; }
+#status-message.success { background-color: rgba(40, 167, 69, 0.15); color: var(--green-color); border: 1px solid var(--green-color); }
+#status-message.error { background-color: rgba(255, 77, 77, 0.15); color: var(--red-color); border: 1px solid var(--red-color); }
+
+/* --- SIDEBAR --- */
+.sidebar-header {
+    padding: 15px 20px; display: flex; align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+.sidebar-header h2 { font-size: 1.4rem; margin-right: auto; }
+.sidebar .channels {
+    flex-grow: 1; overflow-y: auto; padding: 10px 0;
+}
+.expand-sidebar-btn {
+    font-size: 24px; color: var(--text-primary); background-color: var(--surface-1);
+    border: 1px solid var(--border-color); border-left: none; cursor: pointer;
+    position: absolute; top: 50%; right: -26px;
+    transform: translateY(-50%); padding: 8px 0;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    z-index: 9;
+}
+.expand-sidebar-btn:hover { background-color: var(--surface-2); }
+.sidebar.collapsed .expand-sidebar-btn { transform: translateY(-50%) rotate(180deg); }
+
+/* --- Channel List & Dropdown --- */
+.channel {
+    padding: 8px 10px 8px 20px; cursor: pointer; position: relative;
+    transition: background-color 0.2s;
+}
+.channel:hover { background-color: var(--surface-2); }
+.channel-info { display: flex; align-items: center; gap: 12px; position: relative; }
+.channel-info img { width: 40px; height: 40px; border-radius: 50%; transition: width 0.3s, height 0.3s; }
+.channel-info .creator {
+    font-size: 1rem; flex-grow: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.remove-btn {
+    background: none; border: none; font-family: 'Material Icons'; color: var(--text-secondary);
+    cursor: pointer; font-size: 20px; padding: 4px; border-radius: 50%;
+    margin-left: 5px; opacity: 0; transition: opacity 0.2s, background-color 0.2s;
+}
+.channel:hover .remove-btn { opacity: 1; }
+.remove-btn:hover { background-color: var(--surface-3); color: var(--red-color); }
+
+.expandChannel { transition: transform 0.3s ease; flex-shrink: 0; }
+.channel.dropdown-open .expandChannel { transform: rotate(180deg); }
+.notification-dot {
+    width: 8px; height: 8px; background-color: var(--accent-color);
+    border-radius: 50%; margin-right: 10px; flex-shrink: 0;
+}
+@keyframes flash-green { 0% { background-color: rgba(40, 167, 69, 0.4); } 100% { background-color: transparent; } }
+.channel.highlight-green { animation: flash-green 1.5s ease forwards; }
+
+.video-dropdown {
+    display: none; margin-left: 32px; padding-left: 20px;
+    border-left: 2px solid var(--surface-2); margin-top: 10px;
+    max-height: 300px; overflow-y: auto;
+}
+.channel.dropdown-open .video-dropdown { display: block; }
+.dropdown-controls { display: flex; gap: 10px; padding: 8px 5px; }
+.dropdown-controls .styled-select { font-size: 0.85rem; padding: 6px 24px 6px 10px; }
+.dropdown-video {
+    display: flex; gap: 10px; margin-bottom: 10px; cursor: pointer;
+    padding: 5px; border-radius: var(--border-radius); transition: background-color 0.2s;
+}
+.dropdown-video:hover { background-color: var(--surface-2); }
+.dropdown-thumbnail { width: 120px; height: 67.5px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.dropdown-info { display: flex; flex-direction: column; min-width: 0; }
+.dropdown-title {
+    font-size: 0.9rem; margin-bottom: 4px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.dropdown-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 10px; }
+
+/* --- MAIN CONTENT & SAVED VIDEOS --- */
+.main-content h1, .main-content h2 { width: 100%; text-align: center; }
+.main-content h1 { font-size: 2.2rem; margin-bottom: 10px; }
+.main-content h2 { color: var(--text-secondary); font-weight: 500; margin-bottom: 25px; }
+.main-controls { margin-bottom: 20px; width: 100%; max-width: 900px; }
+.sort-controls { display: flex; align-items: center; gap: 10px; max-width: 400px; white-space: nowrap; margin: 0 auto; }
+.sort-controls label { font-size: 0.9rem; color: var(--text-secondary); }
+.saved-videos-container { flex-grow: 1; width: 100%; }
+#video-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.video-item {
+    background: var(--surface-2); border-radius: var(--border-radius); overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    opacity: 0; transform: translateY(20px); text-align: left;
+}
+.video-item.reveal { animation: fadeInUp 0.5s ease forwards; }
+.video-item:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 15px var(--accent-glow); }
+.thumbnail-container { position: relative; overflow: hidden; }
+.video-item-thumbnail { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; cursor: pointer; display: block; transition: transform 0.3s ease; }
+.video-item:hover .video-item-thumbnail { transform: scale(1.05); }
+.video-item-info { padding: 12px; flex-grow: 1; }
+.video-item-title {
+    font-size: 0.95rem; font-weight: 500; margin-bottom: 8px; height: 40px;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.video-item-footer { display: flex; justify-content: space-between; align-items: center; }
+.platform-badge { font-weight: bold; padding: 3px 8px; border-radius: 4px; color: white; font-size: 0.75rem; }
+.platform-youtube { background-color: #ff0000; }
+.platform-vimeo { background-color: #00adef; }
+.delete-btn { background: none; border: none; font-family: 'Material Icons'; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; min-width: auto; }
+.delete-btn:hover { color: var(--red-color); transform: none; filter: none; }
+
+.download-btn {
+    background: none;
+    border: none;
+    font-family: 'Material Icons';
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 24px;
+    padding: 0;
+    min-width: auto;
+}
+.download-btn:hover {
+    color: var(--accent-color);
+    transform: none;
+    filter: none;
+}
+
+/* --- VIDEO PLAYER MODAL --- */
+#video-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.85); z-index: 1000;
+    visibility: hidden; opacity: 0; transition: visibility 0s var(--transition-speed), opacity var(--transition-speed) ease;
+    backdrop-filter: blur(8px); display: flex; justify-content: center;
+    overflow-y: auto; padding: 4vh 20px;
+}
+#video-modal.visible { visibility: visible; opacity: 1; transition-delay: 0s; }
+.modal-content {
+    display: flex; flex-direction: column; align-items: center;
+    transform: scale(0.95); opacity: 0;
+    transition: transform 0.4s var(--cubic-bezier), opacity 0.4s ease;
+    width: 100%; max-width: 1400px;
+}
+#video-modal.visible .modal-content { transform: scale(1); opacity: 1; }
+.player-container { position: relative; width: 100%; aspect-ratio: 16 / 9; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+#ambient-bg {
+    position: absolute; top: -20px; left: -20px; right: -20px; bottom: -20px;
+    filter: blur(80px); transition: background-color 0.5s ease;
+    border-radius: 20px; z-index: -1;
+}
+#videoFrame { width: 100%; height: 100%; border: none; border-radius: 12px; background-color: #000; }
+.modal-video-info {
+    width: 100%; margin-top: 15px; padding: 15px; background-color: rgba(0,0,0,0.2);
+    border-radius: var(--border-radius); visibility: hidden; opacity: 0;
+    transition: opacity 0.3s 0.2s, visibility 0s 0.5s;
+}
+.modal-video-info.visible { visibility: visible; opacity: 1; transition: opacity 0.3s 0.2s, visibility 0s 0s; }
+#ytTitle { font-size: 1.5rem; margin-bottom: 8px; }
+#ytChannel { font-size: 1rem; color: var(--text-secondary); margin-bottom: 12px; }
+.stats-group { display: flex; gap: 20px; color: var(--text-secondary); }
+#close-modal-btn { margin-top: 20px; background-color: var(--surface-2); }
+
+/* --- ACTION PANEL (SEARCH) --- */
+.action-panel h2 { margin-bottom: 20px; }
+.action-tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+.action-tab {
+    padding: 10px 15px; cursor: pointer; border: none; background: none;
+    color: var(--text-secondary); font-size: 1rem; border-radius: 0;
+    position: relative;
+}
+.action-tab::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 2px; background-color: var(--accent-color);
+    transform: scaleX(0); transition: transform 0.3s ease;
+}
+.action-tab.active { color: var(--text-primary); }
+.action-tab.active::after { transform: scaleX(1); }
+.tab-content { display: none; }
+.tab-content.active { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+.search-group { display: flex; gap: 10px; margin-bottom: 15px; }
+.helper-text { color: var(--text-secondary); font-size: 0.9rem; }
+.search-results-list { flex-grow: 1; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; }
+.search-results-list > p { margin-top: 20px; color: var(--text-secondary); }
+.video-result-card, .channel-result-card {
+    display: flex; gap: 15px; margin-bottom: 15px; background: var(--surface-2);
+    padding: 10px; border-radius: var(--border-radius); cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s; width: 100%;
+}
+.video-result-card:hover, .channel-result-card:hover { background-color: var(--surface-3); transform: translateX(5px); }
+.video-result-card img { width: 120px; height: 67.5px; border-radius: 6px; object-fit: cover; }
+.channel-result-card img { width: 60px; height: 60px; border-radius: 50%; }
+.result-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.result-title { font-size: 0.95rem; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result-creator, .result-time, .result-description { font-size: 0.85rem; color: var(--text-secondary); }
+.result-description { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.follow-btn { margin-left: auto; align-self: center; padding: 6px 12px; font-size: 0.85rem; background-color: var(--green-color); transform: none; }
+.follow-btn.unfollow { background-color: var(--red-color); }
+
+/* --- FOOTER & PRELOADER --- */
+.mobile-header, .overlay, #close-actions-mobile, #close-sidebar-mobile { display: none; }
+.preloader-screen, .access-denied-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;
+    background-color: var(--bg-color); display: flex; align-items: center; justify-content: center;
+    text-align: center; opacity: 1; transition: opacity 0.5s ease;
+}
+.preloader-screen.hidden, .access-denied-screen { opacity: 0; visibility: hidden; }
+.access-denied-screen.visible { opacity: 1; visibility: visible; }
+.loader-spinner {
+    width: 32px; height: 32px; border: 3px solid var(--text-secondary); border-radius: 50%;
+    display: inline-block; position: relative; animation: rotation 1s linear infinite; margin: 10px 0;
+}
+.loader-spinner::after {
+    content: ''; box-sizing: border-box; position: absolute;
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid; border-color: var(--accent-color) transparent;
+}
+.denial-message { max-width: 500px; padding: 40px; background-color: var(--surface-1); border: 2px solid var(--red-color); border-radius: var(--border-radius); box-shadow: 0 0 50px rgba(255, 0, 0, 0.2); }
+.denial-icon { font-size: 6rem; color: var(--red-color); margin-bottom: 15px; }
+.denial-message h1 { font-size: 2rem; color: var(--red-color); margin-bottom: 10px; }
+.denial-message p { color: var(--text-secondary); margin-bottom: 8px; }
+.site-footer {
+    position: fixed; bottom: 0; left: 0; right: 0; height: var(--footer-height); z-index: 50;
+    background-color: var(--surface-1); border-top: 1px solid var(--border-color);
+    padding: 0 40px; color: var(--text-secondary); display: flex;
+    justify-content: center; align-items: center;
+}
+.footer-content {
+    max-width: 1200px; width: 100%; display: flex; justify-content: space-between;
+    align-items: center; gap: 30px; margin-left: var(--sidebar-width);
+    margin-right: var(--actions-width);
+}
+.footer-logos { display: flex; align-items: center; gap: 15px; }
+.footer-logo { height: 30px; opacity: 0.7; transition: opacity 0.2s ease; }
+.footer-logo:hover { opacity: 1; }
+.footer-links { display: flex; gap: 10px; align-items: center; font-size: 0.85rem; flex-shrink: 0; }
+.footer-links p { margin: 0; white-space: nowrap; }
+.footer-links a { color: var(--text-secondary); text-decoration: none; transition: color 0.2s ease; }
+.footer-links a:hover { color: var(--text-primary); }
+
+
+/******************************************/
+/* --- DESKTOP-SPECIFIC RESPONSIVENESS ---*/
+/******************************************/
+
+@media (min-width: 1025px) {
+    /* The new, wider state for the sidebar (DESKTOP ONLY) */
+    .sidebar.channel-expanded {
+        width: 500px;
+    }
+
+    /* Adjust the main content and footer margins when the sidebar is expanded (DESKTOP ONLY) */
+body:not(.sidebar-collapsed) .sidebar.channel-expanded ~ .main-content,
+body:not(.sidebar-collapsed) .sidebar.channel-expanded ~ .site-footer .footer-content {
+    margin-left: 500px;
+}
+    /* Style for the channel row ONLY when the dropdown is open (DESKTOP ONLY) */
+    .channel.dropdown-open .channel-info {
+        flex-direction: column;
+        align-items: center;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--surface-2);
+        margin-bottom: 10px;
+    }
+
+    /* Enlarge the thumbnail when the dropdown is open (DESKTOP ONLY) */
+    .channel.dropdown-open .channel-info img {
+        width: 60px;
+        height: 60px;
+    }
+
+    /* Allow the creator name to wrap if it's long (DESKTOP ONLY) */
+    .channel.dropdown-open .channel-info .creator {
+        white-space: normal;
+        text-align: center;
+    }
+
+    /* Reposition the expand/collapse arrow to the top right (DESKTOP ONLY) */
+    .channel.dropdown-open .channel-info .expandChannel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+    }
+
+    /* Hide the notification dot when expanded (DESKTOP ONLY) */
+    .channel.dropdown-open .channel-info .notification-dot {
+        display: none;
+    }
+}
+
+
+/******************************************/
+/* --- TABLET & MOBILE RESPONSIVENESS --- */
+/******************************************/
+
+@media (max-width: 1200px) {
+    .main-content { margin-right: 0; }
+    .action-panel { transform: translateX(100%); z-index: 15; }
+    .footer-content { margin-right: 0; }
+}
+
+@media (max-width: 1024px) {
+    body { padding-bottom: 55px; /* Add padding for the sticky mobile footer */ }
+
+    .main-content {
+        margin-left: 0; margin-right: 0;
+        padding: 80px 15px 20px 15px;
+        min-height: calc(100vh - 60px);
+    }
+
+    /* --- Mobile Header & Overlays --- */
+    .mobile-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 15px; height: 60px; background-color: var(--surface-1);
+        border-bottom: 1px solid var(--border-color);
+        position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    }
+    .overlay.visible {
+        display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1000;
+        opacity: 1; visibility: visible; transition: opacity 0.3s;
+    }
+
+    /* --- Mobile Slide-in Panels --- */
+    .sidebar, .action-panel {
+        position: fixed; top: 0; height: 100%; z-index: 1001;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        /* Ensure smooth slide-in/out transition is applied */
+        transition: transform 0.4s var(--cubic-bezier);
+    }
+    .sidebar { width: 300px; left: 0; transform: translateX(-100%); border-right: none; }
+    .sidebar.mobile-open { transform: translateX(0); }
+    .sidebar.collapsed { transform: translateX(-100%); } /* For consistency */
+    .expand-sidebar-btn { display: none; }
+
+    #close-sidebar-mobile, #close-actions-mobile {
+        display: block; background: none; padding: 5px; border-radius: 50%;
+        font-size: 28px; color: var(--text-secondary); transform: none;
+    }
+    #close-sidebar-mobile:hover, #close-actions-mobile:hover {
+        background-color: var(--surface-2); filter: none;
+    }
+
+    .action-panel { right: 0; width: 320px; transform: translateX(100%); border-left: none; }
+    .action-panel.mobile-open { transform: translateX(0); }
+    #close-actions-mobile { position: absolute; top: 10px; right: 10px; }
+
+    /* --- Mobile Component Adjustments --- */
+    #video-list { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    #video-modal { padding: 20px 10px; }
+    .modal-content { max-width: none; }
+
+    /* --- STICKY MOBILE FOOTER --- */
+    .site-footer {
+        height: 55px;
+        padding: 0 15px;
+        z-index: 998;
+    }
+    .footer-content {
+        margin-left: 0;
+        justify-content: space-between;
+    }
+    .footer-logos p { display: none; }
+    .footer-logo { height: 24px; }
+    .footer-links { font-size: 0.8rem; }
+}
+
+
+/******************************************/
+/* --- SMALL PHONE RESPONSIVENESS --- */
+/******************************************/
+
+@media (max-width: 480px) {
+    /* --- Typography & Spacing --- */
+    .main-content {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    .main-content h1 {
+        font-size: 1.8rem;
+    }
+    .video-item-title {
+        font-size: 0.9rem;
+    }
+    #ytTitle {
+        font-size: 1.2rem;
+    }
+    #ytChannel, .stats-group {
+        font-size: 0.9rem;
+    }
+
+    /* --- Component Adjustments for Narrow Screens --- */
+    .video-result-card, .channel-result-card {
+        flex-direction: column; /* Stack image and text vertically */
+    }
+    .video-result-card img {
+        width: 100%; /* Image takes full width */
+        height: auto;
+        aspect-ratio: 16 / 9;
+    }
+    .channel-result-card img {
+        width: 50px;
+        height: 50px;
+        align-self: flex-start; /* Align avatar to the left */
+    }
+    .channel-result-card {
+        flex-direction: row; /* Keep channel results horizontal but allow wrap */
+        flex-wrap: wrap;
+    }
+    .channel-result-card .result-info {
+        flex-basis: 100%; /* Allow info to wrap below avatar */
+        padding-top: 5px;
+    }
+    .follow-btn {
+        margin-top: 10px;
+        width: 100%;
+    }
+}
+    </style>
+    <script type="module">
+// supabase-client.js
+// This file connects your website to your Supabase backend.
+// It uses your unique Project URL and your public 'anon' key.
+
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+// Your unique project details from the Supabase dashboard
+const SUPABASE_URL = 'https://qvoxpfigbukidlmshiei.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF2b3hwZmlnYnVraWRsbXNoaWVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyOTM2OTEsImV4cCI6MjA2NTg2OTY5MX0.CEbyeIw6QiMxbLBhU7x7Re7SL_unWJMyaJQPS9y-k60';
+
+// Create and export the Supabase client so other files can use it
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// --- START OF FILE script.js ---
+
+// --- CONFIGURATION ---
+const colorThief = new ColorThief();
+
+// --- DOM ELEMENT REFERENCES ---
+const body = document.body;
+const dashboardWrapper = document.getElementById('dashboard-wrapper');
+const preloaderScreen = document.getElementById('preloader-screen');
+const accessDeniedScreen = document.getElementById('access-denied-screen');
+const statusMessage = document.getElementById('status-message');
+const sidebar = document.getElementById('sidebar');
+const actionPanel = document.getElementById('action-panel');
+const expandSidebarBtn = document.getElementById('expand-sidebar-btn');
+const channelsList = document.getElementById('channels-list');
+const checkVideosBtn = document.getElementById('checkVideosBtn');
+const savedVideoList = document.getElementById('video-list');
+const sortSavedVideosSelect = document.getElementById('sort-saved-videos');
+const videoModal = document.getElementById('video-modal');
+const closeModalBtn = document.getElementById('close-modal-btn');
+const videoFrame = document.getElementById('videoFrame');
+const ambientBg = document.getElementById('ambient-bg');
+const thumbnailLoader = document.getElementById('thumbnail-loader');
+const modalVideoInfo = document.getElementById('modal-video-info');
+const ytTitle = document.getElementById('ytTitle');
+const ytChannel = document.getElementById('ytChannel');
+const ytViews = document.getElementById('ytViews');
+const ytDate = document.getElementById('ytDate');
+const actionTabs = document.querySelectorAll('.action-tab');
+const tabContents = document.querySelectorAll('.tab-content');
+const toggleSidebarMobileBtn = document.getElementById('toggle-sidebar-mobile');
+const toggleActionsMobileBtn = document.getElementById('toggle-actions-mobile');
+const closeActionsMobileBtn = document.getElementById('close-actions-mobile');
+const closeSidebarMobileBtn = document.getElementById('close-sidebar-mobile');
+const overlay = document.getElementById('overlay');
+
+// --- LOCAL STATE ---
+let savedVideos = [];
+let followedChannels = {};
+let clientIp = 'unknown';
+
+// --- UTILITY FUNCTION FOR STATUS MESSAGES ---
+function showStatusMessage(message, type = 'success', duration = 4000) {
+    if (!statusMessage) return;
+    statusMessage.textContent = message;
+    statusMessage.className = `show ${type}`;
+    if (statusMessage.timeoutId) clearTimeout(statusMessage.timeoutId);
+    statusMessage.timeoutId = setTimeout(() => {
+        statusMessage.classList.remove('show', 'success', 'error');
+        statusMessage.textContent = '';
+    }, duration);
+}
+
+// --- HELPER FUNCTIONS ---
+const getYouTubeVideoId = (url) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)?. [1] || null;
+const getVimeoVideoId = (url) => url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/)?.[1] || null;
+const getPlaylistId = (url) => url.match(/[?&]list=([a-zA-Z0-9_-]+)/)?.[1] || null;
+
+function parseYTDuration(iso) {
+    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+    const matches = iso.match(regex);
+    if (!matches) return 0;
+    const hours = parseInt(matches[1] || 0);
+    const minutes = parseInt(matches[2] || 0);
+    const seconds = parseInt(matches[3] || 0);
+    return hours * 3600 + minutes * 60 + seconds;
+}
+function formatViews(views) {
+    if (!views) return '0';
+    if (views >= 1000000) return (views / 1000000).toFixed(1) + 'M';
+    if (views >= 1000) return (views / 1000).toFixed(0) + 'K';
+    return views.toLocaleString();
+}
+function timeAgo(date) {
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    const intervals = [
+        { label: 'year', seconds: 31536000 }, { label: 'month', seconds: 2592000 },
+        { label: 'week', seconds: 604800 }, { label: 'day', seconds: 86400 },
+        { label: 'hour', seconds: 3600 }, { label: 'minute', seconds: 60 }, { label: 'second', seconds: 1 },
+    ];
+    for (const interval of intervals) {
+        const count = Math.floor(seconds / interval.seconds);
+        if (count >= 1) return `${count} ${interval.label}${count > 1 ? 's' : ''} ago`;
+    }
+    return 'just now';
+}
+
+async function isClientIpBlocked() {
+    try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        clientIp = ipData.ip;
+        const { data, error } = await supabase.from('blocked_ips').select('ip_address');
+        if (error) {
+            console.error("Error checking for blocked IP:", error);
+            return false;
+        }
+        const blockedIps = data.map(d => d.ip_address);
+        return blockedIps.some(blocked => clientIp === blocked || (blocked.split('.').length === 3 && clientIp.startsWith(blocked + '.')));
+    } catch (e) {
+        console.error("Could not detect client IP address. Assuming non-blocked.", e);
+        return false;
+    }
+}
+
+async function logUserActivity(url, title) {
+    if (clientIp === 'unknown') {
+        try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            clientIp = (await ipResponse.json()).ip;
+        } catch (e) { console.error("Could not detect client IP for logging."); }
+    }
+    const { error } = await supabase.from('user_logs').insert([{ video_url: url, video_title: title, ip_address: clientIp }]);
+    if (error) console.error("Error logging user activity:", error);
+}
+
+// --- LOCAL STORAGE & STATE MANAGEMENT ---
+function loadStateFromStorage() {
+    savedVideos = JSON.parse(localStorage.getItem('universalVideoManager')) || [];
+    followedChannels = JSON.parse(localStorage.getItem('followedChannels')) || {};
+}
+function saveVideosToStorage() { localStorage.setItem('universalVideoManager', JSON.stringify(savedVideos)); }
+function saveChannelsToStorage() { localStorage.setItem('followedChannels', JSON.stringify(followedChannels)); }
+
+// --- API CALLS ---
+async function fetchWithKeyRotation(pathAndParams) {
+    const endpoint = pathAndParams.match(/^([a-zA-Z]+)/)?.[1];
+    if (!endpoint) throw new Error("Invalid API path provided to proxy.");
+    const params = pathAndParams.match(/\?(.*)/)?.[1] || '';
+    const hostname = window.location.hostname;
+    let proxyPath;
+    if (hostname.endsWith('netlify.app')) {
+        proxyPath = '/.netlify/functions/youtubeproxy';
+    } else {
+        proxyPath = '/api/youtubeproxy';
+    }
+    const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
+    try {
+        const res = await fetch(proxyUrl);
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `Proxy failed with status: ${res.status}`);
+        return data;
+    } catch (error) {
+        console.error(`Proxy API Error: ${error.message}`);
+        throw new Error(`Failed to fetch data via proxy: ${error.message}`);
+    }
+}
+
+// --- MODAL VIDEO PLAYER LOGIC ---
+function playVideoInModal(youtubeId) {
+    if (!youtubeId) return;
+    videoFrame.src = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&origin=${window.location.origin}&autoplay=1`;
+    setAmbientColor(youtubeId);
+    updateVideoInfoInModal(youtubeId);
+    videoModal.classList.add('visible');
+    body.style.overflow = 'hidden';
+}
+function closePlayer() {
+    videoModal.classList.remove('visible');
+    videoFrame.src = "";
+    ambientBg.style.backgroundColor = 'transparent';
+    modalVideoInfo.classList.remove('visible');
+    body.style.overflow = '';
+}
+function setAmbientColor(videoId) {
+    thumbnailLoader.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+    thumbnailLoader.onload = () => {
+        try {
+            const [r, g, b] = colorThief.getColor(thumbnailLoader);
+            ambientBg.style.backgroundColor = `rgba(${r},${g},${b},0.5)`;
+        } catch (e) { console.error("ColorThief error:", e); }
+    };
+}
+async function updateVideoInfoInModal(videoId) {
+    modalVideoInfo.classList.remove('visible');
+    ytTitle.textContent = 'Loading...';
+    ytChannel.textContent = ''; ytViews.textContent = ''; ytDate.textContent = '';
+    try {
+        const data = await fetchWithKeyRotation(`videos?part=snippet,statistics&id=${videoId}`);
+        const video = data.items[0];
+        if (video) {
+            ytTitle.textContent = video.snippet.title;
+            ytChannel.textContent = video.snippet.channelTitle;
+            ytViews.textContent = `${parseInt(video.statistics.viewCount).toLocaleString()} views`;
+            ytDate.textContent = `Published on ${new Date(video.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`;
+            modalVideoInfo.classList.add('visible');
+            logUserActivity(`https://www.youtube.com/watch?v=${videoId}`, video.snippet.title);
+        }
+    } catch (e) {
+        console.error("Error fetching video info:", e);
+        ytTitle.textContent = 'Could not load video details.';
+        modalVideoInfo.classList.add('visible');
+    }
+}
+
+// --- SAVED VIDEOS GRID LOGIC ---
+function renderSavedVideos(sortKey = 'date-added-desc') {
+    sortSavedVideos(sortKey);
+    savedVideoList.innerHTML = savedVideos.length === 0 ? '<p style="text-align:center; grid-column: 1 / -1;">No videos saved yet.</p>' : '';
+    savedVideos.forEach((video, index) => {
+        const youtubeId = getYouTubeVideoId(video.url);
+        const vimeoId = getVimeoVideoId(video.url);
+        if (!youtubeId && !vimeoId) return;
+        const thumbnailUrl = youtubeId ? `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg` : `https://vumbnail.com/${vimeoId}.jpg`;
+        const item = document.createElement('div');
+        item.className = 'video-item';
+        item.innerHTML = `
+            <div class="thumbnail-container"><img class="video-item-thumbnail" src="${thumbnailUrl}" alt="${video.title}" data-youtube-id="${youtubeId || ''}"></div>
+            <div class="video-item-info">
+                <p class="video-item-title">${video.title || video.url}</p>
+                <div class="video-item-footer">
+                    <span class="platform-badge platform-${youtubeId ? 'youtube' : 'vimeo'}">${youtubeId ? 'YouTube' : 'Vimeo'}</span>
+                    <div>
+                        <button class="download-btn material-icons" data-video-url="${video.url}" title="Download Video">download</button>
+                        <button class="delete-btn material-icons" data-id="${video.id}" title="Delete Video">delete</button>
+                    </div>
+                </div>
+            </div>`;
+        item.style.animationDelay = `${index * 50}ms`;
+        savedVideoList.appendChild(item);
+        setTimeout(() => item.classList.add('reveal'), 50);
+    });
+}
+function sortSavedVideos(key) {
+    const compareFn = (a, b) => {
+        if (key.includes('title')) return a.title.localeCompare(b.title);
+        return (a.dateAdded || 0) - (b.dateAdded || 0);
+    };
+    savedVideos.sort(compareFn);
+    if (key.endsWith('desc')) savedVideos.reverse();
+}
+async function saveVideo(url, title = null) {
+    if (savedVideos.some(v => v.url === url)) {
+        showStatusMessage('This video is already saved.', 'error');
+        return;
+    }
+    let videoTitle = title;
+    if (!videoTitle && getYouTubeVideoId(url)) {
+        try {
+            const videoId = getYouTubeVideoId(url);
+            const data = await fetchWithKeyRotation(`videos?part=snippet&id=${videoId}`);
+            if (data.items.length > 0) videoTitle = data.items[0].snippet.title;
+        } catch (e) { console.error("Could not fetch video title", e); }
+    }
+    const newVideo = { id: crypto.randomUUID(), url, title: videoTitle || url, dateAdded: Date.now() };
+    savedVideos.unshift(newVideo);
+    saveVideosToStorage();
+    renderSavedVideos(sortSavedVideosSelect.value);
+    showStatusMessage('Video saved successfully!', 'success');
+    await logUserActivity(url, videoTitle);
+}
+async function deleteVideo(id) {
+    savedVideos = savedVideos.filter(video => video.id !== id);
+    saveVideosToStorage();
+    renderSavedVideos(sortSavedVideosSelect.value);
+    showStatusMessage('Video deleted.', 'success');
+}
+
+async function downloadVideo(url) {
+    const downloadButton = document.querySelector(`[data-video-url="${url}"]`);
+    if (!downloadButton) return;
+
+    downloadButton.textContent = 'hourglass_top';
+    downloadButton.classList.add('loading');
+
+    try {
+        const response = await fetch(`/.netlify/functions/downloadproxy?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+
+        if (data.status === 'ok') {
+            const link = document.createElement('a');
+            link.href = data.download_url;
+            link.download = data.title;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showStatusMessage('Download started!', 'success');
+        } else {
+            showStatusMessage(data.error || 'Could not get download link.', 'error');
+        }
+    } catch (error) {
+        showStatusMessage('An error occurred while downloading.', 'error');
+    } finally {
+        downloadButton.textContent = 'download';
+        downloadButton.classList.remove('loading');
+    }
+}
+
+// --- ACTION PANEL LOGIC ---
+async function searchYouTube(query, type, resultsContainer) {
+    resultsContainer.innerHTML = '<div class="loader"></div>';
+    try {
+        const data = await fetchWithKeyRotation(`search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
+        resultsContainer.innerHTML = data.items.length === 0 ? '<p>No results found.</p>' : '';
+        if (type === 'video') renderVideoSearchResults(data.items, resultsContainer);
+        if (type === 'channel') renderChannelSearchResults(data.items, resultsContainer);
+    } catch (error) {
+        resultsContainer.innerHTML = `<p style="color: var(--red-color);">Error: ${error.message}</p>`;
+    }
+}
+function renderVideoSearchResults(items, container) {
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'video-result-card';
+        card.innerHTML = `
+            <img src="${item.snippet.thumbnails.medium.url}" alt="${item.snippet.title}">
+            <div class="result-info">
+                <div class="result-title">${item.snippet.title}</div>
+                <div class="result-creator">${item.snippet.channelTitle}</div>
+                <div class="result-time">${timeAgo(new Date(item.snippet.publishedAt))}</div>
+            </div>
+            <button class="download-btn material-icons" data-video-url="https://www.youtube.com/watch?v=${item.id.videoId}" title="Download Video">download</button>
+`;
+        card.querySelector('.result-info').onclick = () => saveVideo(`https://www.youtube.com/watch?v=${item.id.videoId}`, item.snippet.title);
+        container.appendChild(card);
+    });
+}
+function renderChannelSearchResults(items, container) {
+    items.forEach(item => {
+        const { channelId, title, description, thumbnails } = item.snippet;
+        const internalName = title.replace(/\s/g, '');
+        const isFollowing = !!followedChannels[internalName];
+        const card = document.createElement('div');
+        card.className = 'channel-result-card';
+        card.innerHTML = `
+            <img src="${thumbnails.medium.url}" alt="${title}">
+            <div class="result-info">
+                <div class="result-title">${title}</div>
+                <div class="result-description">${description}</div>
+            </div>
+            <button class="follow-btn ${isFollowing ? 'unfollow' : ''}">${isFollowing ? 'Follow' : 'Follow'}</button>`;
+        card.querySelector('.follow-btn').onclick = (e) => {
+            e.stopPropagation();
+            if (isFollowing) removeYoutubeChannel(internalName);
+            else addYoutubeChannel(internalName, title, channelId, thumbnails.medium.url);
+            searchYouTube(document.getElementById('channel-search-input').value, 'channel', document.getElementById('channel-search-results'));
+        };
+        container.appendChild(card);
+    });
+}
+
+// --- SIDEBAR LOGIC ---
+function renderFollowedChannels() {
+    channelsList.innerHTML = '';
+    Object.entries(followedChannels).forEach(([internalName, data]) => {
+        const isPlaylist = data.type === 'playlist';
+        const elementDiv = document.createElement('div');
+        elementDiv.className = 'channel'; // Using 'channel' class for consistent styling
+        elementDiv.dataset.channel = internalName;
+
+        // Use a different icon for playlists
+        const icon = isPlaylist ? 'playlist_play' : 'expand_more';
+
+        elementDiv.innerHTML = `
+            <div class="channel-info" data-name="${internalName}">
+                <span class="expandChannel material-icons">${icon}</span>
+                <img src="${data.thumbnailUrl}" alt="${data.displayName}">
+                <span class="creator">${data.displayName}</span>
+                <button class="remove-btn material-icons" data-internal-name="${internalName}" title="Remove">close</button>
+                ${!isPlaylist ? `<span class="notification-dot" id="notif-${internalName}" style="display: none;"></span>` : ''}
+            </div>
+            <div class="video-dropdown" id="dropdown-${internalName}">
+                ${!isPlaylist ? `
+                <div class="dropdown-controls">
+                     <select class="sort-dropdown styled-select" data-channel-name="${internalName}">
+                        <option value="newest">Newest</option><option value="views">Most Views</option>
+                        <option value="shortest">Shortest</option><option value="longest">Longest</option>
+                    </select>
+                </div>` : ''}
+            </div>`;
+        channelsList.appendChild(elementDiv);
+
+        // If it's a playlist, render its videos immediately since they are already fetched
+        if (isPlaylist && data.videos) {
+            const container = document.getElementById(`dropdown-${internalName}`);
+            data.videos.forEach(video => {
+                container.insertAdjacentHTML('beforeend', `
+                    <div class="dropdown-video" data-video-id="${video.id}" data-channel-name="${internalName}" data-title="${video.title}">
+                        <img class="dropdown-thumbnail" src="${video.thumbnail}" alt="${video.title}">
+                        <div class="dropdown-info">
+                            <div class="dropdown-title">${video.title}</div>
+                             <div class="dropdown-meta"><span>${timeAgo(new Date(video.publishedAt))}</span></div>
+                        </div>
+                    </div>`);
+            });
+        }
+    });
+}
+async function addPlaylistById(playlistId) {
+    if (!playlistId) return;
+
+    // Check if the playlist is already followed to avoid duplicates
+    const isAlreadyFollowed = Object.values(followedChannels).some(c => c.id === playlistId && c.type === 'playlist');
+    if (isAlreadyFollowed) {
+        showStatusMessage('This playlist is already in your following list.', 'error');
+        return;
+    }
+
+    try {
+        // 1. Fetch playlist details (for the title)
+        const playlistData = await fetchWithKeyRotation(`playlists?part=snippet&id=${playlistId}`);
+        if (!playlistData.items || playlistData.items.length === 0) {
+            throw new Error("Playlist not found or is private.");
+        }
+        const playlistTitle = playlistData.items[0].snippet.title;
+        const playlistThumbnail = playlistData.items[0].snippet.thumbnails.medium.url;
+
+        // 2. Fetch playlist items (the videos)
+        const videoData = await fetchWithKeyRotation(`playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`);
+        const videos = videoData.items.map(item => ({
+            id: item.snippet.resourceId.videoId,
+            title: item.snippet.title,
+            thumbnail: item.snippet.thumbnails.medium.url,
+            publishedAt: item.snippet.publishedAt,
+            viewCount: 0, // Note: playlistItems endpoint doesn't provide view counts
+            duration: 0 // Note: playlistItems endpoint doesn't provide duration
+        }));
+
+        // 3. Add to our local state (re-using the 'followedChannels' structure for simplicity)
+        const internalName = `playlist_${playlistId}`;
+        followedChannels[internalName] = {
+            id: playlistId,
+            displayName: playlistTitle,
+            thumbnailUrl: playlistThumbnail,
+            type: 'playlist', // Differentiate from channels
+            videos: videos // Store videos directly
+        };
+
+        saveChannelsToStorage();
+        renderFollowedChannels(); // Re-render the sidebar
+        showStatusMessage(`Playlist "${playlistTitle}" added successfully!`, 'success');
+        logUserActivity(`https://www.youtube.com/playlist?list=${playlistId}`, `Followed Playlist: ${playlistTitle}`);
+
+    } catch (error) {
+        console.error("Error adding playlist:", error);
+        showStatusMessage(`Failed to add playlist: ${error.message}`, 'error');
+    }
+}
+
+async function addChannelByHandle(handle) {
+    if (!handle) return;
+
+    try {
+        const channelData = await fetchWithKeyRotation(`channels?part=snippet&forHandle=${handle}`);
+        if (!channelData.items || channelData.items.length === 0) {
+            throw new Error("Channel handle not found.");
+        }
+        const { id, snippet } = channelData.items[0];
+        const { title, thumbnails } = snippet;
+        const internalName = title.replace(/\s/g, '');
+
+        if (followedChannels[internalName]) {
+            showStatusMessage(`You are already following ${title}.`, 'info');
+            return;
+        }
+
+        addYoutubeChannel(internalName, title, id, thumbnails.medium.url);
+        logUserActivity(`https://www.youtube.com/handle/@${handle}`, `Followed Channel by Handle: ${title}`);
+
+    } catch (error) {
+        console.error("Error adding channel by handle:", error);
+        showStatusMessage(`Failed to follow channel: ${error.message}`, 'error');
+    }
+}
+
+function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
+    if (followedChannels[internalName]) return;
+    followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl };
+    saveChannelsToStorage();
+    renderFollowedChannels();
+    showStatusMessage(`Following ${displayName}`, 'success');
+    logUserActivity(`https://www.youtube.com/channel/${channelId}`, `Followed: ${displayName}`);
+}
+function removeYoutubeChannel(internalName) {
+    const channelData = followedChannels[internalName];
+    if (!channelData) return;
+
+    const isPlaylist = channelData.type === 'playlist';
+    const message = isPlaylist ? `Playlist "${channelData.displayName}" removed.` : `Unfollowed ${channelData.displayName}.`;
+
+    delete followedChannels[internalName];
+    saveChannelsToStorage();
+    renderFollowedChannels();
+    showStatusMessage(message, 'success');
+}
+async function fetchAndCacheChannelVideos(channelName, channelId) {
+    const channelDiv = document.querySelector(`.channel[data-channel="${channelName}"]`);
+    try {
+        const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
+        const videoIds = searchData.items.map(v => v.id.videoId).join(',');
+        if (!videoIds) return;
+        const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
+        const videos = detailsData.items.map(item => ({
+            id: item.id, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url,
+            publishedAt: item.snippet.publishedAt, viewCount: parseInt(item.statistics.viewCount || 0),
+            duration: parseYTDuration(item.contentDetails.duration)
+        }));
+        if (videos.length > 0) updateChannelDropdown(channelName, videos, true);
+        if (channelDiv) {
+            channelDiv.classList.add("highlight-green");
+            channelDiv.addEventListener("animationend", () => channelDiv.classList.remove("highlight-green"), { once: true });
+        }
+    } catch (err) { console.error(`Error checking ${channelName}:`, err); }
+}
+async function checkAllChannels() {
+    checkVideosBtn.classList.add('loading');
+    const promises = Object.values(followedChannels).map(data => fetchAndCacheChannelVideos(data.displayName.replace(/\s/g, ''), data.id));
+    await Promise.all(promises);
+    checkVideosBtn.classList.remove('loading');
+}
+function updateChannelDropdown(channelName, videos, merge = false) {
+    const container = document.getElementById(`dropdown-${channelName}`);
+    const notification = document.getElementById(`notif-${channelName}`);
+    if (!container || !notification) return;
+    const storageKey = `videos-${channelName}`;
+    let existingVideos = [];
+    if (merge) {
+        try { existingVideos = JSON.parse(localStorage.getItem(storageKey))?.videos || []; }
+        catch (e) { console.error("Could not parse existing videos, starting fresh."); }
+    }
+    const newVideos = videos.filter(v => !existingVideos.some(ev => ev.id === v.id));
+    const allVideos = [...newVideos, ...existingVideos];
+    const dataToStore = { timestamp: Date.now(), videos: allVideos };
+    localStorage.setItem(storageKey, JSON.stringify(dataToStore));
+    sortDropdownVideos(allVideos, container.querySelector('.sort-dropdown')?.value || 'newest');
+    container.querySelectorAll('.dropdown-video').forEach(el => el.remove());
+    allVideos.forEach(video => {
+        const isSaved = savedVideos.some(sv => getYouTubeVideoId(sv.url) === video.id);
+        container.insertAdjacentHTML('beforeend', `
+            <div class="dropdown-video" data-video-id="${video.id}" data-channel-name="${channelName}" data-title="${video.title}">
+                <img class="dropdown-thumbnail" src="${video.thumbnail}" alt="${video.title}">
+                <div class="dropdown-info">
+                    <div class="dropdown-title">${video.title}</div>
+                    <div class="dropdown-meta"><span>${formatViews(video.viewCount)} views</span> • <span>${timeAgo(new Date(video.publishedAt))}</span></div>
+                </div>
+            </div>`);
+    });
+    notification.style.display = allVideos.length > 0 ? 'block' : 'none';
+}
+function sortDropdownVideos(videos, key) {
+    const SORTS = {
+        'views': (a, b) => (b.viewCount || 0) - (a.viewCount || 0),
+        'shortest': (a, b) => (a.duration || 0) - (b.duration || 0),
+        'longest': (a, b) => (b.duration || 0) - (a.duration || 0),
+        'newest': (a, b) => new Date(b.publishedAt) - new Date(a.publishedAt),
+    };
+    videos.sort(SORTS[key] || SORTS['newest']);
+}
+async function handleDropdownVideoClick(videoElement) {
+    const { videoId, title, channelName } = videoElement.dataset;
+    await saveVideo(`https://www.youtube.com/watch?v=${videoId}`, title);
+    try {
+        const storageKey = `videos-${channelName}`;
+        const storedData = JSON.parse(localStorage.getItem(storageKey)) || { videos: [] };
+        storedData.videos = storedData.videos.filter(v => v.id !== videoId);
+        localStorage.setItem(storageKey, JSON.stringify(storedData));
+        videoElement.remove();
+        if (storedData.videos.length === 0) {
+            const notification = document.getElementById(`notif-${channelName}`);
+            if (notification) notification.style.display = 'none';
+        }
+    } catch (e) { console.error("Error updating dropdown cache after save:", e); }
+}
+
+// --- INITIALIZATION & EVENT LISTENERS ---
+document.addEventListener('DOMContentLoaded', async () => {
+    preloaderScreen.classList.add('hidden');
+    if (await isClientIpBlocked()) {
+        accessDeniedScreen.classList.add('visible');
+        return;
+    }
+    dashboardWrapper.style.display = 'flex';
+    loadStateFromStorage();
+    renderSavedVideos();
+    renderFollowedChannels();
+    restoreDropdownVideosFromStorage();
+
+    // Check for video or playlist source in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoSource = urlParams.get('source');
+    const channelSource = urlParams.get('channel_source');
+    if (window.location.pathname.includes('/video') && videoSource) {
+        playVideoInModal(videoSource);
+    } else if (window.location.pathname.includes('/playlist') && videoSource) {
+        addPlaylistById(videoSource);
+    } else if (window.location.pathname.includes('/channel') && videoSource) {
+        addChannelByHandle(videoSource);
+    } else if (channelSource) {
+        addChannelByHandle(channelSource);
+    }
+});
+closeModalBtn.addEventListener('click', closePlayer);
+videoModal.addEventListener('click', e => e.target === videoModal && closePlayer());
+sortSavedVideosSelect.addEventListener('change', e => renderSavedVideos(e.target.value));
+savedVideoList.addEventListener('click', e => {
+    if (e.target.closest('.delete-btn')) {
+        if (confirm('Are you sure you want to delete this video?')) deleteVideo(e.target.closest('.delete-btn').dataset.id);
+    } else if (e.target.closest('.download-btn')) {
+        downloadVideo(e.target.closest('.download-btn').dataset.videoUrl);
+    } else if (e.target.closest('.video-item-thumbnail')?.dataset.youtubeId) {
+        playVideoInModal(e.target.closest('.video-item-thumbnail').dataset.youtubeId);
+    }
+});
+document.getElementById('video-search-results').addEventListener('click', e => {
+    if (e.target.closest('.download-btn')) {
+        downloadVideo(e.target.closest('.download-btn').dataset.videoUrl);
+    }
+});
+expandSidebarBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    body.classList.toggle('sidebar-collapsed');
+    expandSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? 'chevron_right' : 'chevron_left';
+});
+checkVideosBtn.addEventListener('click', checkAllChannels);
+channelsList.addEventListener('click', e => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+        const internalName = removeBtn.dataset.internalName;
+        if (internalName) {
+            removeYoutubeChannel(internalName);
+        }
+        return; // Stop further processing
+    }
+
+    const channelInfo = e.target.closest('.channel-info');
+    const dropdownVideo = e.target.closest('.dropdown-video');
+    const sortSelect = e.target.closest('.sort-dropdown');
+
+    if (channelInfo) {
+        const channelElement = channelInfo.parentElement;
+        const wasOpen = channelElement.classList.contains('dropdown-open');
+
+        // First, close any other open channels
+        channelsList.querySelectorAll('.channel.dropdown-open').forEach(openChannel => {
+            openChannel.classList.remove('dropdown-open');
+        });
+
+        // If the clicked channel was NOT already open, open it
+        if (!wasOpen) {
+            channelElement.classList.add('dropdown-open');
+        }
+
+        // Now, toggle the master class on the sidebar itself
+        const isAnyChannelOpen = !!channelsList.querySelector('.channel.dropdown-open');
+        sidebar.classList.toggle('channel-expanded', isAnyChannelOpen);
+
+    } else if (dropdownVideo) {
+        handleDropdownVideoClick(dropdownVideo);
+    } else if (sortSelect) {
+        const storedData = JSON.parse(localStorage.getItem(`videos-${sortSelect.dataset.channelName}`)) || { videos: [] };
+        updateChannelDropdown(sortSelect.dataset.channelName, storedData.videos, false);
+    }
+});
+actionTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        actionTabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+    });
+});
+document.getElementById('embed-button').addEventListener('click', async () => {
+    const input = document.getElementById('embed-url-input');
+    const url = input.value.trim();
+    const playlistId = getPlaylistId(url);
+
+    if (playlistId) {
+        await addPlaylistById(playlistId);
+        input.value = '';
+    } else if (getYouTubeVideoId(url) || getVimeoVideoId(url)) {
+        await saveVideo(url);
+        input.value = '';
+    } else {
+        showStatusMessage("Please enter a valid YouTube video, Vimeo video, or YouTube playlist URL.", "error");
+    }
+});
+document.getElementById('video-search-button').addEventListener('click', () => {
+    const query = document.getElementById('video-search-input').value.trim();
+    if (query) searchYouTube(query, 'video', document.getElementById('video-search-results'));
+});
+document.getElementById('channel-search-button').addEventListener('click', () => {
+    const query = document.getElementById('channel-search-input').value.trim();
+    if (query) searchYouTube(query, 'channel', document.getElementById('channel-search-results'));
+});
+['embed-url-input', 'video-search-input', 'channel-search-input'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') e.target.nextElementSibling.click();
+    });
+});
+const togglePanel = (panel, isOpen) => {
+    panel.classList.toggle('mobile-open', isOpen);
+    overlay.classList.toggle('visible', isOpen);
+    toggleActionsMobileBtn.style.visibility = isOpen && panel.id === 'sidebar' ? 'hidden' : 'visible';
+    toggleSidebarMobileBtn.style.visibility = isOpen && panel.id === 'action-panel' ? 'hidden' : 'visible';
+};
+toggleSidebarMobileBtn.addEventListener('click', () => togglePanel(sidebar, true));
+toggleActionsMobileBtn.addEventListener('click', () => togglePanel(actionPanel, true));
+closeActionsMobileBtn.addEventListener('click', () => togglePanel(actionPanel, false));
+closeSidebarMobileBtn.addEventListener('click', () => togglePanel(sidebar, false));
+overlay.addEventListener('click', () => {
+    togglePanel(sidebar, false);
+    togglePanel(actionPanel, false);
+});
+function restoreDropdownVideosFromStorage() {
+    Object.entries(followedChannels).forEach(([channelName, channelData]) => {
+        // If it's a playlist, we don't need to do anything here as the videos are stored with the playlist object itself.
+        if (channelData.type === 'playlist') {
+            return;
+        }
+
+        const storageKey = `videos-${channelName}`;
+        const storedDataJSON = localStorage.getItem(storageKey);
+        if (!storedDataJSON) {
+            console.log(`No cache for ${channelName}. Fetching initial data...`);
+            fetchAndCacheChannelVideos(channelName, channelData.id);
+            return;
+        }
+        try {
+            const storedData = JSON.parse(storedDataJSON);
+            const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
+            if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
+                console.log(`Cache for ${channelName} is stale. Auto-refreshing...`);
+                fetchAndCacheChannelVideos(channelName, channelData.id);
+            }
+            else if (storedData.videos && storedData.videos.length > 0) {
+                updateChannelDropdown(channelName, storedData.videos, false);
+            }
+        } catch (e) {
+            console.error(`Clearing corrupted data for ${channelName} and re-fetching:`, e);
+            localStorage.removeItem(storageKey);
+            fetchAndCacheChannelVideos(channelName, channelData.id);
+        }
+    });
+}
+    </script>
+    <script src="techloq.js" defer></script>
+</head>
+<body>
+
+    <!-- ======== PRELOADER SCREEN (Visible by default) ======== -->
+    <div id="preloader-screen" class="preloader-screen">
+        <div class="preloader-content">
+            <div class="loader-spinner"></div>
+            <p>Loading Dashboard...</p>
+        </div>
+    </div>
+    <!-- ==================================================== -->
+
+    <!-- ======== IP BLOCK SCREEN (Hidden by default) ======== -->
+    <div id="access-denied-screen" class="access-denied-screen hidden">
+        <div class="denial-message">
+            <span class="material-icons denial-icon">block</span>
+            <h1>ACCESS DENIED</h1>
+            <p>Your IP address has been flagged and blocked due to abuse.</p>
+            <p>If you believe this is an error, please contact support.</p>
+            <p>For more information, please review our <a href="terms.html">Terms of Service</a>.</p>
+        </div>
+    </div>
+    <!-- ==================================================== -->
+
+    <!-- WRAPPER FOR ALL DASHBOARD CONTENT (Initially hidden by CSS) -->
+    <div id="dashboard-wrapper">
+
+        <!-- ======== MOBILE HEADER ======== -->
+        <header class="mobile-header">
+            <button id="toggle-sidebar-mobile" class="material-icons">menu</button>
+            <h1>SK Player</h1>
+            <button id="toggle-actions-mobile" class="material-icons">add_circle_outline</button>
+        </header>
+
+        <!-- ======== SIDEBAR (FOLLOWING) ======== -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Following</h2>
+                <button id="close-sidebar-mobile" class="material-icons">close</button>
+                <span id="checkVideosBtn" class="material-icons icon-btn" title="Check for new videos">refresh</span>
+            </div>
+            <div class="channels" id="channels-list">
+            </div>
+            <span class="expand-sidebar-btn material-icons" id="expand-sidebar-btn">chevron_left</span>
+        </aside>
+
+        <!-- ======== MAIN CONTENT (SAVED VIDEOS) ======== -->
+        <main class="main-content">
+            <h1>Shalom Karr's YouTube Player</h1>
+            <h2>🌟 Saved Videos</h2>
+
+            <!-- NEW: Status Message Display -->
+            <div id="status-message"></div>
+
+            <div class="main-controls">
+                <div class="sort-controls">
+                    <label for="sort-saved-videos">Sort by:</label>
+                    <select id="sort-saved-videos" class="styled-select">
+                        <option value="date-added-desc">Recently Added</option>
+                        <option value="date-added-asc">Oldest Added</option>
+                        <option value="title-asc">Title (A-Z)</option>
+                        <option value="title-desc">Title (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="saved-videos-container">
+                <div id="video-list">
+                </div>
+            </div>
+        </main>
+
+        <!-- ======== ACTION PANEL (SEARCH & ADD) ======== -->
+        <section class="action-panel" id="action-panel">
+             <button id="close-actions-mobile" class="material-icons">close</button>
+            <h2>Actions</h2>
+            <div class="action-tabs">
+                <button class="action-tab active" data-tab="embed">Embed Link</button>
+                <button class="action-tab" data-tab="videos">Search Videos</button>
+                <button class="action-tab" data-tab="channels">Search Creators</button>
+            </div>
+
+            <div class="tab-content active" id="tab-embed">
+                <div class="search-group">
+                    <input type="text" id="embed-url-input" placeholder="Paste YouTube/Vimeo link...">
+                    <button id="embed-button">Add</button>
+                </div>
+                <p class="helper-text">Paste a full video link from YouTube or Vimeo to add it to your saved list.</p>
+            </div>
+
+            <div class="tab-content" id="tab-videos">
+                <div class="search-group">
+                    <input type="text" id="video-search-input" placeholder="Search for videos...">
+                    <button id="video-search-button">Search</button>
+                </div>
+                <div class="search-results-list" id="video-search-results"></div>
+            </div>
+
+            <div class="tab-content" id="tab-channels">
+                <div class="search-group">
+                    <input type="text" id="channel-search-input" placeholder="Search for creators...">
+                    <button id="channel-search-button">Search</button>
+                </div>
+                <div class="search-results-list" id="channel-search-results"></div>
+            </div>
+        </section>
+
+        <div class="overlay" id="overlay"></div>
+
+        <!-- ======== VIDEO MODAL ======== -->
+        <div id="video-modal">
+            <div class="modal-content">
+                <div class="player-container">
+                    <div id="ambient-bg"></div>
+                    <iframe id="videoFrame" src="" allow="encrypted-media" allowfullscreen></iframe>
+                    <img id="thumbnail-loader" crossorigin="anonymous" style="display:none;">
+                </div>
+
+                <div id="modal-video-info" class="modal-video-info">
+                    <h3 id="ytTitle">Loading...</h3>
+                    <p id="ytChannel"></p>
+                    <div class="stats-group">
+                        <p id="ytViews"></p>
+                        <p id="ytDate"></p>
+                    </div>
+                </div>
+
+                <button id="close-modal-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- ======== FOOTER ======== -->
+        <footer class="site-footer">
+            <div class="footer-content">
+                <div class="footer-logos">
+                    <a href="https://yhstudios.github.io/">
+                        <img src="https://yhstudios.github.io/image1.png" alt="YH Studios Logo" class="footer-logo">
+                    </a>
+                    <p>Developed by Shalom Karr and YH Studios.</p>
+                </div>
+                <div class="footer-links">
+                    <a href="terms.html">Terms of Service</a>
+                    <p>•</p>
+                    <a href="privacy.html">Privacy Policy</a>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+</body>
+
+</html>
