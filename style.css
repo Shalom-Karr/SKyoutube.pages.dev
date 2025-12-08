@@ -254,6 +254,16 @@ input[type="text"]:focus, .styled-select:focus {
 .platform-badge { font-weight: bold; padding: 3px 8px; border-radius: 4px; color: white; font-size: 0.75rem; }
 .platform-youtube { background-color: #ff0000; }
 .platform-vimeo { background-color: #00adef; }
+.music-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: #ff00ff;
+    color: white;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
 .delete-btn { background: none; border: none; font-family: 'Material Icons'; color: var(--text-secondary); cursor: pointer; font-size: 24px; padding: 0; min-width: auto; }
 .delete-btn:hover { color: var(--red-color); transform: none; filter: none; }
 

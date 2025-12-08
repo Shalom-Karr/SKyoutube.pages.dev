@@ -58,6 +58,8 @@ function showStatusMessage(message, type = 'success', duration = 4000) {
 const getYouTubeVideoId = (url) => url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([0-9A-Za-z_-]{11})/)?. [1] || null;
 const getVimeoVideoId = (url) => url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/)?.[1] || null;
 const getPlaylistId = (url) => url.match(/[?&]list=([a-zA-Z0-9_-]+)/)?.[1] || null;
+const getYTMusicChannelId = (url) => url.match(/music\.youtube\.com\/channel\/([a-zA-Z0-9_-]+)/)?.[1] || null;
+const getYTMusicBrowseId = (url) => url.match(/music\.youtube\.com\/browse\/([a-zA-Z0-9_-]+)/)?.[1] || null;
 
 function parseYTDuration(iso) {
     const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
@@ -284,6 +286,46 @@ function renderVideoSearchResults(items, container) {
         container.appendChild(card);
     });
 }
+
+async function getSuggestions() {
+    const resultsContainer = document.getElementById('suggestions-results');
+    resultsContainer.innerHTML = '<div class="loader"></div>';
+
+    try {
+        const videoIds = savedVideos.map(v => getYouTubeVideoId(v.url)).filter(Boolean);
+        const channelIds = Object.values(followedChannels).map(c => c.id);
+
+        let seedVideoId = videoIds.length > 0 ? videoIds[Math.floor(Math.random() * videoIds.length)] : null;
+        let seedChannelId = channelIds.length > 0 ? channelIds[Math.floor(Math.random() * channelIds.length)] : null;
+
+        if (!seedVideoId && !seedChannelId) {
+            resultsContainer.innerHTML = '<p>Follow some channels or save some videos to get suggestions.</p>';
+            return;
+        }
+
+        let suggestions = [];
+        if (seedVideoId) {
+            const data = await fetchWithKeyRotation(`search?part=snippet&relatedToVideoId=${seedVideoId}&type=video&maxResults=10`);
+            suggestions = suggestions.concat(data.items);
+        }
+
+        if (seedChannelId && suggestions.length < 20) {
+            const data = await fetchWithKeyRotation(`search?part=snippet&channelId=${seedChannelId}&type=video&maxResults=10`);
+            suggestions = suggestions.concat(data.items);
+        }
+
+        if (suggestions.length === 0) {
+            resultsContainer.innerHTML = '<p>No suggestions found.</p>';
+            return;
+        }
+
+        resultsContainer.innerHTML = '';
+        renderVideoSearchResults(suggestions, resultsContainer);
+
+    } catch (error) {
+        resultsContainer.innerHTML = `<p style="color: var(--red-color);">Error: ${error.message}</p>`;
+    }
+}
 function renderChannelSearchResults(items, container) {
     items.forEach(item => {
         const { channelId, title, description, thumbnails } = item.snippet;
@@ -314,17 +356,18 @@ function renderFollowedChannels() {
     Object.entries(followedChannels).forEach(([internalName, data]) => {
         const isPlaylist = data.type === 'playlist';
         const elementDiv = document.createElement('div');
-        elementDiv.className = 'channel'; // Using 'channel' class for consistent styling
+        elementDiv.className = 'channel';
         elementDiv.dataset.channel = internalName;
 
-        // Use a different icon for playlists
         const icon = isPlaylist ? 'playlist_play' : 'expand_more';
+        const musicBadge = data.isMusic ? '<span class="music-badge">Music</span>' : '';
 
         elementDiv.innerHTML = `
             <div class="channel-info" data-name="${internalName}">
                 <span class="expandChannel material-icons">${icon}</span>
                 <img src="${data.thumbnailUrl}" alt="${data.displayName}">
                 <span class="creator">${data.displayName}</span>
+                ${musicBadge}
                 <button class="remove-btn material-icons" data-internal-name="${internalName}" title="Remove">close</button>
                 ${!isPlaylist ? `<span class="notification-dot" id="notif-${internalName}" style="display: none;"></span>` : ''}
             </div>
@@ -332,14 +375,15 @@ function renderFollowedChannels() {
                 ${!isPlaylist ? `
                 <div class="dropdown-controls">
                      <select class="sort-dropdown styled-select" data-channel-name="${internalName}">
-                        <option value="newest">Newest</option><option value="views">Most Views</option>
-                        <option value="shortest">Shortest</option><option value="longest">Longest</option>
+                        <option value="newest">Newest</option>
+                        <option value="views">Most Views</option>
+                        <option value="shortest">Shortest</option>
+                        <option value="longest">Longest</option>
                     </select>
                 </div>` : ''}
             </div>`;
         channelsList.appendChild(elementDiv);
 
-        // If it's a playlist, render its videos immediately since they are already fetched
         if (isPlaylist && data.videos) {
             const container = document.getElementById(`dropdown-${internalName}`);
             data.videos.forEach(video => {
@@ -355,10 +399,9 @@ function renderFollowedChannels() {
         }
     });
 }
-async function addPlaylistById(playlistId) {
+async function addPlaylistById(playlistId, isMusic = false) {
     if (!playlistId) return;
 
-    // Check if the playlist is already followed to avoid duplicates
     const isAlreadyFollowed = Object.values(followedChannels).some(c => c.id === playlistId && c.type === 'playlist');
     if (isAlreadyFollowed) {
         showStatusMessage('This playlist is already in your following list.', 'error');
@@ -366,37 +409,36 @@ async function addPlaylistById(playlistId) {
     }
 
     try {
-        // 1. Fetch playlist details (for the title)
         const playlistData = await fetchWithKeyRotation(`playlists?part=snippet&id=${playlistId}`);
-        if (!playlistData.items || playlistData.items.length === 0) {
-            throw new Error("Playlist not found or is private.");
-        }
-        const playlistTitle = playlistData.items[0].snippet.title;
-        const playlistThumbnail = playlistData.items[0].snippet.thumbnails.medium.url;
+        if (!playlistData.items || playlistData.items.length === 0) throw new Error("Playlist not found or is private.");
 
-        // 2. Fetch playlist items (the videos)
+        const { title: playlistTitle, thumbnails } = playlistData.items[0].snippet;
+        const playlistThumbnail = thumbnails.medium.url;
+
         const videoData = await fetchWithKeyRotation(`playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`);
-        const videos = videoData.items.map(item => ({
-            id: item.snippet.resourceId.videoId,
-            title: item.snippet.title,
-            thumbnail: item.snippet.thumbnails.medium.url,
-            publishedAt: item.snippet.publishedAt,
-            viewCount: 0, // Note: playlistItems endpoint doesn't provide view counts
-            duration: 0 // Note: playlistItems endpoint doesn't provide duration
-        }));
+        const videos = videoData.items
+            .filter(item => item.snippet.resourceId && item.snippet.resourceId.videoId)
+            .map(item => ({
+                id: item.snippet.resourceId.videoId,
+                title: item.snippet.title,
+                thumbnail: item.snippet.thumbnails?.medium?.url || 'path/to/default/thumbnail.jpg',
+                publishedAt: item.snippet.publishedAt,
+                viewCount: 0,
+                duration: 0
+            }));
 
-        // 3. Add to our local state (re-using the 'followedChannels' structure for simplicity)
         const internalName = `playlist_${playlistId}`;
         followedChannels[internalName] = {
             id: playlistId,
             displayName: playlistTitle,
             thumbnailUrl: playlistThumbnail,
-            type: 'playlist', // Differentiate from channels
-            videos: videos // Store videos directly
+            type: 'playlist',
+            isMusic: isMusic,
+            videos: videos
         };
 
         saveChannelsToStorage();
-        renderFollowedChannels(); // Re-render the sidebar
+        renderFollowedChannels();
         showStatusMessage(`Playlist "${playlistTitle}" added successfully!`, 'success');
         logUserActivity(`https://www.youtube.com/playlist?list=${playlistId}`, `Followed Playlist: ${playlistTitle}`);
 
@@ -432,9 +474,35 @@ async function addChannelByHandle(handle) {
     }
 }
 
-function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl) {
+async function addChannelById(channelId, isMusic = false) {
+    if (!channelId) return;
+
+    try {
+        const channelData = await fetchWithKeyRotation(`channels?part=snippet&id=${channelId}`);
+        if (!channelData.items || channelData.items.length === 0) {
+            throw new Error("Channel not found.");
+        }
+        const { id, snippet } = channelData.items[0];
+        const { title, thumbnails } = snippet;
+        const internalName = title.replace(/\s/g, '');
+
+        if (followedChannels[internalName]) {
+            showStatusMessage(`You are already following ${title}.`, 'info');
+            return;
+        }
+
+        addYoutubeChannel(internalName, title, id, thumbnails.medium.url, isMusic);
+        logUserActivity(`https://www.youtube.com/channel/${id}`, `Followed Channel by ID: ${title}`);
+
+    } catch (error) {
+        console.error("Error adding channel by ID:", error);
+        showStatusMessage(`Failed to follow channel: ${error.message}`, 'error');
+    }
+}
+
+function addYoutubeChannel(internalName, displayName, channelId, thumbnailUrl, isMusic = false) {
     if (followedChannels[internalName]) return;
-    followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl };
+    followedChannels[internalName] = { id: channelId, displayName, thumbnailUrl, isMusic };
     saveChannelsToStorage();
     renderFollowedChannels();
     showStatusMessage(`Following ${displayName}`, 'success');
@@ -548,12 +616,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const videoSource = urlParams.get('source');
     const channelSource = urlParams.get('channel_source');
+    const isMusic = urlParams.get('isMusic') === 'true';
     if (window.location.pathname.includes('/video') && videoSource) {
         playVideoInModal(videoSource);
     } else if (window.location.pathname.includes('/playlist') && videoSource) {
-        addPlaylistById(videoSource);
+        addPlaylistById(videoSource, isMusic);
     } else if (window.location.pathname.includes('/channel') && videoSource) {
-        addChannelByHandle(videoSource);
+        // Check if the source is a channel ID or a handle
+        if (videoSource.startsWith('UC') || videoSource.startsWith('HC')) {
+            addChannelById(videoSource, isMusic);
+        } else {
+            addChannelByHandle(videoSource);
+        }
     } else if (channelSource) {
         addChannelByHandle(channelSource);
     }
@@ -625,15 +699,22 @@ document.getElementById('embed-button').addEventListener('click', async () => {
     const input = document.getElementById('embed-url-input');
     const url = input.value.trim();
     const playlistId = getPlaylistId(url);
+    const ytMusicChannelId = getYTMusicChannelId(url);
+    const ytMusicBrowseId = getYTMusicBrowseId(url);
 
     if (playlistId) {
-        await addPlaylistById(playlistId);
+        await addPlaylistById(playlistId, url.includes('music.youtube.com'));
         input.value = '';
+    } else if (ytMusicChannelId) {
+        await addChannelById(ytMusicChannelId, true);
+        input.value = '';
+    } else if (ytMusicBrowseId) {
+        showStatusMessage("Auto-generated mixes and artist pages are not supported yet.", "info");
     } else if (getYouTubeVideoId(url) || getVimeoVideoId(url)) {
         await saveVideo(url);
         input.value = '';
     } else {
-        showStatusMessage("Please enter a valid YouTube video, Vimeo video, or YouTube playlist URL.", "error");
+        showStatusMessage("Please enter a valid YouTube, Vimeo, or YouTube Music URL.", "error");
     }
 });
 document.getElementById('video-search-button').addEventListener('click', () => {
@@ -644,6 +725,8 @@ document.getElementById('channel-search-button').addEventListener('click', () =>
     const query = document.getElementById('channel-search-input').value.trim();
     if (query) searchYouTube(query, 'channel', document.getElementById('channel-search-results'));
 });
+
+document.getElementById('suggestions-button').addEventListener('click', getSuggestions);
 ['embed-url-input', 'video-search-input', 'channel-search-input'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => {
         if (e.key === 'Enter') e.target.nextElementSibling.click();
