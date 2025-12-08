@@ -2,6 +2,7 @@
 
 // --- Supabase Configuration ---
 import { supabase } from './supabase-client.js';
+import { fetchFromProxy } from './api.js';
 
 // --- CONFIGURATION ---
 const colorThief = new ColorThief();
@@ -128,30 +129,6 @@ function loadStateFromStorage() {
 function saveVideosToStorage() { localStorage.setItem('universalVideoManager', JSON.stringify(savedVideos)); }
 function saveChannelsToStorage() { localStorage.setItem('followedChannels', JSON.stringify(followedChannels)); }
 
-// --- API CALLS ---
-async function fetchWithKeyRotation(pathAndParams) {
-    const endpoint = pathAndParams.match(/^([a-zA-Z]+)/)?.[1];
-    if (!endpoint) throw new Error("Invalid API path provided to proxy.");
-    const params = pathAndParams.match(/\?(.*)/)?.[1] || '';
-    const hostname = window.location.hostname;
-    let proxyPath;
-    if (hostname.endsWith('netlify.app')) {
-        proxyPath = '/.netlify/functions/youtubeproxy';
-    } else {
-        proxyPath = '/api/youtubeproxy';
-    }
-    const proxyUrl = `${proxyPath}?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
-    try {
-        const res = await fetch(proxyUrl);
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || `Proxy failed with status: ${res.status}`);
-        return data;
-    } catch (error) {
-        console.error(`Proxy API Error: ${error.message}`);
-        throw new Error(`Failed to fetch data via proxy: ${error.message}`);
-    }
-}
-
 // --- MODAL VIDEO PLAYER LOGIC ---
 function playVideoInModal(youtubeId) {
     if (!youtubeId) return;
@@ -182,7 +159,7 @@ async function updateVideoInfoInModal(videoId) {
     ytTitle.textContent = 'Loading...';
     ytChannel.textContent = ''; ytViews.textContent = ''; ytDate.textContent = '';
     try {
-        const data = await fetchWithKeyRotation(`videos?part=snippet,statistics&id=${videoId}`);
+        const data = await fetchFromProxy('videos', `part=snippet,statistics&id=${videoId}`);
         const video = data.items[0];
         if (video) {
             ytTitle.textContent = video.snippet.title;
@@ -190,7 +167,7 @@ async function updateVideoInfoInModal(videoId) {
             ytViews.textContent = `${parseInt(video.statistics.viewCount).toLocaleString()} views`;
             ytDate.textContent = `Published on ${new Date(video.snippet.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`;
             modalVideoInfo.classList.add('visible');
-            logUserActivity(`https://www.youtube.com/watch?v=${videoId}`, video.snippet.title);            
+            logUserActivity(`https://www.youtube.com/watch?v=${videoId}`, video.snippet.title);
         }
     } catch (e) {
         console.error("Error fetching video info:", e);
@@ -241,7 +218,7 @@ async function saveVideo(url, title = null) {
     if (!videoTitle && getYouTubeVideoId(url)) {
         try {
             const videoId = getYouTubeVideoId(url);
-            const data = await fetchWithKeyRotation(`videos?part=snippet&id=${videoId}`);
+            const data = await fetchFromProxy('videos', `part=snippet&id=${videoId}`);
             if (data.items.length > 0) videoTitle = data.items[0].snippet.title;
         } catch (e) { console.error("Could not fetch video title", e); }
     }
@@ -263,7 +240,7 @@ async function deleteVideo(id) {
 async function searchYouTube(query, type, resultsContainer) {
     resultsContainer.innerHTML = '<div class="loader"></div>';
     try {
-        const data = await fetchWithKeyRotation(`search?part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
+        const data = await fetchFromProxy('search', `part=snippet&type=${type}&maxResults=20&q=${encodeURIComponent(query)}`);
         resultsContainer.innerHTML = data.items.length === 0 ? '<p>No results found.</p>' : '';
         if (type === 'video') renderVideoSearchResults(data.items, resultsContainer);
         if (type === 'channel') renderChannelSearchResults(data.items, resultsContainer);
@@ -292,35 +269,38 @@ async function getSuggestions() {
     resultsContainer.innerHTML = '<div class="loader"></div>';
 
     try {
-        const videoIds = savedVideos.map(v => getYouTubeVideoId(v.url)).filter(Boolean);
-        const channelIds = Object.values(followedChannels).map(c => c.id);
-
-        let seedVideoId = videoIds.length > 0 ? videoIds[Math.floor(Math.random() * videoIds.length)] : null;
+        const randomVideo = savedVideos.length > 0 ? savedVideos[Math.floor(Math.random() * savedVideos.length)] : null;
+        const channelIds = Object.values(followedChannels).filter(c => c.type !== 'playlist').map(c => c.id);
         let seedChannelId = channelIds.length > 0 ? channelIds[Math.floor(Math.random() * channelIds.length)] : null;
 
-        if (!seedVideoId && !seedChannelId) {
+        if (!randomVideo && !seedChannelId) {
             resultsContainer.innerHTML = '<p>Follow some channels or save some videos to get suggestions.</p>';
             return;
         }
 
         let suggestions = [];
-        if (seedVideoId) {
-            const data = await fetchWithKeyRotation(`search?part=snippet&relatedToVideoId=${seedVideoId}&type=video&maxResults=10`);
+        if (randomVideo && randomVideo.title) {
+            // Use a few words from the title for a broader search
+            const query = randomVideo.title.split(' ').slice(0, 5).join(' ');
+            const data = await fetchFromProxy('search', `part=snippet&type=video&maxResults=10&q=${encodeURIComponent(query)}`);
             suggestions = suggestions.concat(data.items);
         }
 
         if (seedChannelId && suggestions.length < 20) {
-            const data = await fetchWithKeyRotation(`search?part=snippet&channelId=${seedChannelId}&type=video&maxResults=10`);
-            suggestions = suggestions.concat(data.items);
+            const data = await fetchFromProxy('search', `part=snippet&channelId=${seedChannelId}&type=video&maxResults=10&order=date`);
+            const existingIds = new Set(suggestions.map(s => s.id.videoId));
+            const newItems = data.items.filter(item => !existingIds.has(item.id.videoId));
+            suggestions = suggestions.concat(newItems);
         }
 
         if (suggestions.length === 0) {
-            resultsContainer.innerHTML = '<p>No suggestions found.</p>';
+            resultsContainer.innerHTML = '<p>No suggestions found. Try saving more videos or following channels.</p>';
             return;
         }
 
         resultsContainer.innerHTML = '';
-        renderVideoSearchResults(suggestions, resultsContainer);
+        suggestions.sort(() => Math.random() - 0.5); // Shuffle results
+        renderVideoSearchResults(suggestions.slice(0, 20), resultsContainer);
 
     } catch (error) {
         resultsContainer.innerHTML = `<p style="color: var(--red-color);">Error: ${error.message}</p>`;
@@ -409,13 +389,13 @@ async function addPlaylistById(playlistId, isMusic = false) {
     }
 
     try {
-        const playlistData = await fetchWithKeyRotation(`playlists?part=snippet&id=${playlistId}`);
+        const playlistData = await fetchFromProxy('playlists', `part=snippet&id=${playlistId}`);
         if (!playlistData.items || playlistData.items.length === 0) throw new Error("Playlist not found or is private.");
 
         const { title: playlistTitle, thumbnails } = playlistData.items[0].snippet;
         const playlistThumbnail = thumbnails.medium.url;
 
-        const videoData = await fetchWithKeyRotation(`playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50`);
+        const videoData = await fetchFromProxy('playlistItems', `part=snippet&playlistId=${playlistId}&maxResults=50`);
         const videos = videoData.items
             .filter(item => item.snippet.resourceId && item.snippet.resourceId.videoId)
             .map(item => ({
@@ -452,7 +432,7 @@ async function addChannelByHandle(handle) {
     if (!handle) return;
 
     try {
-        const channelData = await fetchWithKeyRotation(`channels?part=snippet&forHandle=${handle}`);
+        const channelData = await fetchFromProxy('channels', `part=snippet&forHandle=${handle}`);
         if (!channelData.items || channelData.items.length === 0) {
             throw new Error("Channel handle not found.");
         }
@@ -478,7 +458,7 @@ async function addChannelById(channelId, isMusic = false) {
     if (!channelId) return;
 
     try {
-        const channelData = await fetchWithKeyRotation(`channels?part=snippet&id=${channelId}`);
+        const channelData = await fetchFromProxy('channels', `part=snippet&id=${channelId}`);
         if (!channelData.items || channelData.items.length === 0) {
             throw new Error("Channel not found.");
         }
@@ -523,10 +503,10 @@ function removeYoutubeChannel(internalName) {
 async function fetchAndCacheChannelVideos(channelName, channelId) {
     const channelDiv = document.querySelector(`.channel[data-channel="${channelName}"]`);
     try {
-        const searchData = await fetchWithKeyRotation(`search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
+        const searchData = await fetchFromProxy('search', `part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video`);
         const videoIds = searchData.items.map(v => v.id.videoId).join(',');
         if (!videoIds) return;
-        const detailsData = await fetchWithKeyRotation(`videos?part=snippet,statistics,contentDetails&id=${videoIds}`);
+        const detailsData = await fetchFromProxy('videos', `part=snippet,statistics,contentDetails&id=${videoIds}`);
         const videos = detailsData.items.map(item => ({
             id: item.id, title: item.snippet.title, thumbnail: item.snippet.thumbnails.medium.url,
             publishedAt: item.snippet.publishedAt, viewCount: parseInt(item.statistics.viewCount || 0),
@@ -552,7 +532,7 @@ function updateChannelDropdown(channelName, videos, merge = false) {
     const storageKey = `videos-${channelName}`;
     let existingVideos = [];
     if (merge) {
-        try { existingVideos = JSON.parse(localStorage.getItem(storageKey))?.videos || []; } 
+        try { existingVideos = JSON.parse(localStorage.getItem(storageKey))?.videos || []; }
         catch (e) { console.error("Could not parse existing videos, starting fresh."); }
     }
     const newVideos = videos.filter(v => !existingVideos.some(ev => ev.id === v.id));
@@ -766,7 +746,7 @@ function restoreDropdownVideosFromStorage() {
             if (!storedData.timestamp || (Date.now() - storedData.timestamp > thirtyDaysInMillis)) {
                 console.log(`Cache for ${channelName} is stale. Auto-refreshing...`);
                 fetchAndCacheChannelVideos(channelName, channelData.id);
-            } 
+            }
             else if (storedData.videos && storedData.videos.length > 0) {
                 updateChannelDropdown(channelName, storedData.videos, false);
             }
@@ -777,4 +757,3 @@ function restoreDropdownVideosFromStorage() {
         }
     });
 }
-
