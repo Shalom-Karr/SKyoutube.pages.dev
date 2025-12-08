@@ -1,26 +1,30 @@
 // ==UserScript==
-// @name         YouTube to SK Dashboard Redirector
+// @name         Universal SK Redirector
 // @namespace    http://tampermonkey.net/
-// @version      4.1 // Added Playlist Support
-// @description  Instantly redirects from YouTube video and playlist pages. On ALL Techloq pages, it performs immediate and extremely persistent polling.
+// @version      7.1
+// @description  Redirects from YouTube, Reddit, JTech, and Techloq to custom sites or a proxy fallback.
 // @author       Shalom Karr / YH Studios
+// @match        *://www.youtube.com/*
+// @match        *://music.youtube.com/*
+// @match        *://forums.jtechforums.org/*
 // @match        *://filter.techloq.com/*
-// @match        *://www.youtube.com/watch*
-// @match        *://www.youtube.com/playlist*
 // @run-at       document-start
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/Shalom-Karr/youtube-redirector/main/youtube-redirector.user.js
-// @downloadURL  https://raw.githubusercontent.com/Shalom-Karr/youtube-redirector/main/youtube-redirector.user.js
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    // --- CONFIGURATION ---
-    const BASE_DASHBOARD_URL = 'https://skyoutubebeta.netlify.app';
+    // --- CENTRAL CONFIGURATION ---
+    const PROXY_DOMAIN = 'https://example.com'; // Replace with the actual proxy domain
+    const REDIRECT_CONFIG = [
+        { type: 'path', sourceDomain: 'forums.jtechforums.org', targetDomain: 'https://jtechwebsite.shalomkarr.workers.dev' },
+        { type: 'youtube', sourceDomain: 'www.youtube.com', targetDomain: 'https://skyoutubebeta.netlify.app' },
+        { type: 'youtube', sourceDomain: 'music.youtube.com', targetDomain: 'https://skyoutubebeta.netlify.app' }
+    ];
 
-    // Polling Settings
-    const MAX_TECHLOQ_RETRIES = 1200;
+    // Polling Settings for Techloq
+    const MAX_TECHLOQ_RETRIES = 1200; // Total time: 5 minutes (1200 * 250ms)
     const TECHLOQ_RETRY_INTERVAL_MS = 250;
     // --- END CONFIGURATION ---
 
@@ -28,90 +32,136 @@
 
     let techloqAttemptCount = 0;
 
-    function getVideoId(url) {
-        const pattern = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-        return url.match(pattern)?.[1] || null;
+    // --- REDIRECT HANDLERS ---
+
+    function performPathRedirect(targetDomain, urlObject) {
+        const newUrl = `${targetDomain}${urlObject.pathname}${urlObject.search}`;
+        window.location.replace(newUrl);
     }
 
-    function getPlaylistId(url) {
-        const pattern = /[?&]list=([a-zA-Z0-9_-]+)/;
-        return url.match(pattern)?.[1] || null;
+    function performYoutubeRedirect(targetDomain, urlString) {
+        const isMusic = urlString.includes('music.youtube.com');
+        const musicParam = isMusic ? '&isMusic=true' : '';
+
+        const playlistPattern = /[?&]list=([a-zA-Z0-9_-]+)/;
+        const videoPattern = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const channelPattern = /youtube\.com\/@([^\/?]+)/;
+        const musicChannelPattern = /music\.youtube\.com\/channel\/([a-zA-Z0-9_-]+)/;
+
+        const playlistId = urlString.match(playlistPattern)?.[1];
+        if (playlistId) {
+            window.location.replace(`${targetDomain}/playlist?source=${encodeURIComponent(playlistId)}${musicParam}`);
+            return;
+        }
+
+        const videoId = urlString.match(videoPattern)?.[1];
+        if (videoId) {
+            window.location.replace(`${targetDomain}/video?source=${encodeURIComponent(videoId)}`);
+            return;
+        }
+
+        const channelHandle = urlString.match(channelPattern)?.[1];
+        if (channelHandle) {
+            window.location.replace(`${targetDomain}/channel?source=${encodeURIComponent(channelHandle)}`);
+            return;
+        }
+
+        const musicChannelId = urlString.match(musicChannelPattern)?.[1];
+        if (musicChannelId) {
+            window.location.replace(`${targetDomain}/channel?source=${encodeURIComponent(musicChannelId)}${musicParam}`);
+            return;
+        }
+
+
+        window.location.replace(targetDomain);
     }
 
-    function redirectToDashboard(type, id) {
-        if (!id) return;
-        const path = type === 'playlist' ? '/playlist?source=' : '/video?source=';
-        const redirectUrl = `${BASE_DASHBOARD_URL}${path}${encodeURIComponent(id)}`;
-        window.location.replace(redirectUrl);
-    }
+    // --- TECHLOQ POLLING LOGIC ---
 
-    // --- TECHLOQ SPECIFIC LOGIC ---
+    function pollForBlockedUrl() {
+        let originalUrlStr = '';
 
-    function findMediaIds() {
-        let videoId = null;
-        let playlistId = null;
-        let urlToCheck = '';
-
+        // Method 1: Check the URL's query parameter first.
         try {
             const params = new URLSearchParams(window.location.search);
             const encodedRedirectUrl = params.get('redirectUrl');
             if (encodedRedirectUrl) {
-                urlToCheck = decodeURIComponent(encodedRedirectUrl);
+                originalUrlStr = decodeURIComponent(encodedRedirectUrl);
             }
-        } catch (e) {}
-
-        const blockDiv = document.querySelector('div.block-url a');
-        if (blockDiv && blockDiv.href) {
-            urlToCheck = blockDiv.href;
+        } catch (e) {
+            console.error("Error parsing Techloq URL query parameters:", e);
         }
 
-        if (urlToCheck) {
-            videoId = getVideoId(urlToCheck);
-            playlistId = getPlaylistId(urlToCheck);
+        // Method 2 (Fallback): Find the URL in the page content (the <a> tag).
+        if (!originalUrlStr) {
+             const blockedLinkElement = document.querySelector('div.block-url a');
+             if (blockedLinkElement && blockedLinkElement.href) {
+                 originalUrlStr = blockedLinkElement.href;
+             }
         }
 
-        return { videoId, playlistId };
-    }
+        if (originalUrlStr) {
+            // A blocked URL was found. Decide where to redirect.
+            try {
+                const urlObject = new URL(originalUrlStr);
+                const hostname = urlObject.hostname.replace(/^www\./, '');
+                let customRedirectFound = false;
 
-    function attemptTechloqRedirect() {
-        const { videoId, playlistId } = findMediaIds();
+                // First, check if there's a custom redirect for this domain.
+                for (const rule of REDIRECT_CONFIG) {
+                    if (hostname.includes(rule.sourceDomain.replace(/^www\./, ''))) {
+                        customRedirectFound = true;
+                        if (rule.type === 'path') {
+                            performPathRedirect(rule.targetDomain, urlObject);
+                        } else if (rule.type === 'youtube') {
+                            performYoutubeRedirect(rule.targetDomain, originalUrlStr);
+                        }
+                        return; // Success, stop polling.
+                    }
+                }
 
-        if (playlistId) {
-            redirectToDashboard('playlist', playlistId);
-            return;
+                // If no custom redirect exists, use the proxy as a fallback.
+                if (!customRedirectFound) {
+                    window.location.replace(`${PROXY_DOMAIN}/proxy?url=${encodeURIComponent(originalUrlStr)}`);
+                    return; // Stop polling.
+                }
+            } catch (e) {
+                console.error("Error processing the blocked URL:", e);
+                // Fallback to proxy homepage on error
+                window.location.replace(PROXY_DOMAIN);
+            }
+            return; // Should be unreachable, but good for safety.
         }
-        if (videoId) {
-            redirectToDashboard('video', videoId);
-            return;
-        }
 
+        // If no blocked URL is found, continue polling until timeout.
         techloqAttemptCount++;
         if (techloqAttemptCount < MAX_TECHLOQ_RETRIES) {
-            setTimeout(attemptTechloqRedirect, TECHLOQ_RETRY_INTERVAL_MS);
+            setTimeout(pollForBlockedUrl, TECHLOQ_RETRY_INTERVAL_MS);
+        } else {
+            // Polling timed out. Assume this is not a block page (e.g., settings)
+            // or it's the base domain. Redirect to the proxy's homepage.
+            window.location.replace(PROXY_DOMAIN);
         }
     }
 
     // --- SCRIPT EXECUTION LOGIC ---
 
-    const currentUrl = window.location.href;
     const currentHostname = window.location.hostname;
 
-    if (currentHostname === 'www.youtube.com') {
-        const playlistId = getPlaylistId(currentUrl);
-        if (playlistId) {
-            redirectToDashboard('playlist', playlistId);
-            return;
-        }
-
-        const videoId = getVideoId(currentUrl);
-        if (videoId) {
-            redirectToDashboard('video', videoId);
-        }
-        return;
-    }
-
     if (currentHostname.includes('filter.techloq.com')) {
-        attemptTechloqRedirect();
-    }
+        pollForBlockedUrl();
+    } else {
+        const currentUrl = window.location.href;
 
+        for (const rule of REDIRECT_CONFIG) {
+            if (currentHostname.includes(rule.sourceDomain)) {
+                 if (rule.type === 'path') {
+                    performPathRedirect(rule.targetDomain, new URL(currentUrl));
+                } else if (rule.type === 'youtube') {
+                    performYoutubeRedirect(rule.targetDomain, currentUrl);
+                }
+                break;
+            }
+        }
+    }
 })();
