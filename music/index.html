@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ED5564">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Stream music from whitelisted artists - A modern PWA music player">
+  <title>Zemer Music</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="title" id="topTitle">Zemer</div>
+      <button class="icon-btn" id="queueBtn" aria-label="Show queue">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/></svg>
+      </button>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+      </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="content">
+      <div class="viewport" id="viewport" style="transform: translateX(0%);">
+
+        <!-- Home Page -->
+        <div class="page" id="homePage">
+          <div id="homeContent"></div>
+        </div>
+
+        <!-- Artists Page -->
+        <div class="page" id="artistsPage">
+          <div class="search-bar">
+            <div class="search-box">
+              <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" class="search-input" id="artistFilterInput" placeholder="Filter artists..." autocomplete="off" aria-label="Filter artists">
+              <button class="search-clear" id="artistFilterClear">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="artistsContent"></div>
+        </div>
+
+        <!-- Search Page -->
+        <div class="page" id="searchPage">
+          <div class="search-bar">
+            <div class="search-box">
+              <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+              <input type="text" class="search-input" id="searchInput" placeholder="Search songs, artists..." autocomplete="off" aria-label="Search music">
+              <button class="search-clear" id="searchClear">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="searchButton" style="margin: 12px 16px;">Search</button>
+          <div id="searchContent"></div>
+        </div>
+
+        <!-- Library Page -->
+        <div class="page" id="libraryPage">
+          <div id="libraryContent">
+            <div class="empty">
+              <div class="empty-icon">📚</div>
+              <div class="empty-title">Library</div>
+              <div class="empty-text">Your saved songs will appear here</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Mini Player -->
+    <div class="mini-player" id="miniPlayer" role="button" tabindex="0" aria-label="Open full player">
+      <div class="mini-progress">
+        <div class="mini-progress-bar" id="miniProgress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+      <div class="mini-content">
+        <div class="mini-thumb" id="miniThumb">
+          <div style="width:100%;height:100%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;align-items:center;justify-content:center;font-size:20px;">🎵</div>
+        </div>
+        <div class="mini-info">
+          <div class="mini-title" id="miniTitle">No song playing</div>
+          <div class="mini-artist" id="miniArtist">Select a song</div>
+        </div>
+        <button class="mini-btn play-btn" id="miniPlayBtn" aria-label="Play/Pause">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Full Player Sheet -->
+    <div class="player-sheet" id="playerSheet" role="dialog" aria-label="Now playing">
+      <div class="player-content">
+        <div class="handle" id="handle">
+          <div class="handle-bar"></div>
+        </div>
+
+        <button class="player-close-btn" id="closePlayerBtn" aria-label="Close player">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+
+        <div class="artwork-container">
+          <div class="artwork" id="artwork">
+            <div style="width:100%;height:100%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));display:flex;align-items:center;justify-content:center;font-size:64px;">🎵</div>
+          </div>
+        </div>
+
+        <div class="track-info">
+          <div class="track-title" id="trackTitle">No song playing</div>
+          <div class="track-artist" id="trackArtist">Select a song</div>
+          <div class="stream-url-box" id="streamUrlBox" style="display: none; margin-top: 12px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 11px; word-break: break-all; font-family: monospace; opacity: 0.7;">
+            <div style="margin-bottom: 4px; font-weight: 600; opacity: 0.8;">Stream URL:</div>
+            <div id="streamUrl"></div>
+          </div>
+        </div>
+
+        <div class="slider-container">
+          <div class="slider" id="slider" role="slider" aria-label="Seek" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" tabindex="0">
+            <div class="slider-fill" id="sliderFill"></div>
+          </div>
+          <div class="time">
+            <span id="currentTime">0:00</span>
+            <span id="totalTime">0:00</span>
+          </div>
+        </div>
+
+        <div class="secondary-controls">
+          <button class="icon-btn" id="shuffleBtn" aria-label="Toggle shuffle">
+            <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          </button>
+          <button class="icon-btn" id="repeatBtn" aria-label="Toggle repeat">
+            <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+          </button>
+        </div>
+
+        <div class="controls">
+          <button class="ctrl-btn secondary" id="prevBtn" aria-label="Previous track">
+            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          <button class="ctrl-btn play-btn" id="playBtn" aria-label="Play/Pause">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="ctrl-btn secondary" id="nextBtn" aria-label="Next track">
+            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+        </div>
+
+        <button class="btn btn-ghost" id="shareBtn" style="margin: 16px auto; display: none;">
+          <svg style="width: 20px; height: 20px;" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+          Share
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+      <div class="nav-item active" role="button" tabindex="0" aria-label="Home">
+        <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" role="button" tabindex="0" aria-label="Artists">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        <span class="nav-label">Artists</span>
+      </div>
+      <div class="nav-item" role="button" tabindex="0" aria-label="Search">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <span class="nav-label">Search</span>
+      </div>
+      <div class="nav-item" role="button" tabindex="0" aria-label="Library">
+        <svg viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 5h-3v5.5c0 1.38-1.12 2.5-2.5 2.5S10 13.88 10 12.5s1.12-2.5 2.5-2.5c.57 0 1.08.19 1.5.51V5h4v2zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6z"/></svg>
+        <span class="nav-label">Library</span>
+      </div>
+    </nav>
+
+    <!-- Artist Detail Overlay (will be managed by JS) -->
+    <div class="artist-overlay" id="artistOverlay">
+      <div class="artist-detail" id="artistDetail"></div>
+    </div>
+
+    <!-- Hidden YouTube Player -->
+    <div id="yt-player" aria-hidden="true"></div>
+  </div>
+
+  <!-- Load main app module -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
