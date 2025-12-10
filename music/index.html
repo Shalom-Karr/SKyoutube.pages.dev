@@ -220,14 +220,14 @@
     <div id="queueOverlay" class="queue-overlay">
       <div id="queueDrawer" class="queue-drawer">
         <div class="queue-header">
-          <h2>Queue</h2>
-          <button id="queueClose" class="icon-btn" aria-label="Close">
+          <h2 class="queue-title">Queue</h2>
+          <button id="queueClose" class="icon-btn" aria-label="Close queue">
             <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
           </button>
         </div>
         <div class="queue-actions">
-          <button id="clearQueueBtn" class="btn btn-ghost">Clear</button>
-          <button id="saveQueueBtn" class="btn btn-ghost">Save as Playlist</button>
+          <button id="clearQueueBtn" class="btn btn-secondary">Clear Queue</button>
+          <button id="saveQueueBtn" class="btn btn-primary">Save as Playlist</button>
         </div>
         <div id="queueList" class="queue-list"></div>
       </div>
@@ -240,6 +240,7 @@
     <div id="yt-player" aria-hidden="true"></div>
   </div>
 <script src="https://www.youtube.com/iframe_api"></script>
+<script type="module" src="/music/tracking.js"></script>
 <script type="module" src="/music/app.js"></script>
 </body>
 </html>
