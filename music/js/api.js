@@ -39,11 +39,18 @@ export async function fetchArtistWhitelist() {
         const { data: artists, error } = await supabase.from('artists').select('*');
         if (error) throw error;
 
-        const channelIds = artists.map(a => a.channel_id).join(',');
-        const channelData = await fetchFromProxy('channels', `part=snippet&id=${channelIds}`);
+        const allChannelItems = [];
+        const channelIds = artists.map(a => a.channel_id);
+        const chunkSize = 50;
+
+        for (let i = 0; i < channelIds.length; i += chunkSize) {
+            const chunk = channelIds.slice(i, i + chunkSize);
+            const channelData = await fetchFromProxy('channels', `part=snippet&id=${chunk.join(',')}`);
+            allChannelItems.push(...channelData.items);
+        }
 
         const artistsWithAvatars = artists.map(artist => {
-            const channel = channelData.items.find(c => c.id === artist.channel_id);
+            const channel = allChannelItems.find(c => c.id === artist.channel_id);
             return {
                 ...artist,
                 avatar: channel ? channel.snippet.thumbnails.default.url : null,

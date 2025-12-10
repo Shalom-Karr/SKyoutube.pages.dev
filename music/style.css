@@ -233,9 +233,16 @@ body {
 .artwork {
     width: 100%;
     aspect-ratio: 1 / 1;
-    border-radius: var(--radius-lg);
+    border-radius: 50%; /* Make it a circle for spinning */
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,.5);
+}
+.artwork.spinning img {
+    animation: spin 30s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 .artwork img {
     width: 100%;
@@ -478,6 +485,32 @@ body {
     font-size: 0.8rem;
 }
 
+/* --- Settings Panel --- */
+.settings-panel {
+    position: fixed;
+    top: calc(var(--header-height) + 24px);
+    right: 16px;
+    width: 300px;
+    padding: 24px;
+    z-index: 150;
+    opacity: 0;
+    transform: translateY(-10px);
+    visibility: hidden;
+    transition: all var(--transition-fast);
+}
+.settings-panel.visible {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.toggle-switch {
+    /* Basic styling for the switch */
+}
 
 /* --- Responsive --- */
 @media (max-width: 768px) {

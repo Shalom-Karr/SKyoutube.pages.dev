@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
         favorites: JSON.parse(localStorage.getItem('favorites')) || [],
         playlists: JSON.parse(localStorage.getItem('playlists')) || [],
         theme: localStorage.getItem('theme') || 'dark',
+        settings: {
+            albumArtSpin: true,
+        }
     };
 
     let progressInterval = null;
@@ -21,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function onPlayerStateChange(event) {
         const isPlaying = event.data === YT.PlayerState.PLAYING;
-        UI.updatePlayButtonState(isPlaying);
+        UI.updatePlayButtonState(isPlaying, state.settings.albumArtSpin);
 
         if (isPlaying) {
             startProgressUpdates();
@@ -229,12 +232,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         document.getElementById('closePlayerBtn').addEventListener('click', UI.closeFullPlayer);
+
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsPanel').classList.toggle('visible');
+        });
+
+        document.getElementById('spinToggle').addEventListener('change', (e) => {
+            state.settings.albumArtSpin = e.target.checked;
+            const artwork = document.getElementById('artwork');
+            const isPlaying = Player.getPlayer().getPlayerState() === YT.PlayerState.PLAYING;
+            artwork.classList.toggle('spinning', isPlaying && state.settings.albumArtSpin);
+        });
     }
 
     async function init() {
         document.documentElement.setAttribute('data-theme', state.theme);
         Player.initYouTubePlayer(null, onPlayerStateChange);
         state.artistWhitelist = await fetchArtistWhitelist();
+        document.getElementById('spinToggle').checked = state.settings.albumArtSpin;
         renderHomePage();
         bindEventListeners();
         console.log("SK Music player loaded and ready.");

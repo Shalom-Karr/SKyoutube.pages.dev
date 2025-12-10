@@ -28,6 +28,9 @@ export function cacheDOM() {
     dom.searchButton = document.getElementById('searchButton');
     dom.shuffleBtn = document.getElementById('shuffleBtn');
     dom.repeatBtn = document.getElementById('repeatBtn');
+    dom.settingsBtn = document.getElementById('settingsBtn');
+    dom.settingsPanel = document.getElementById('settingsPanel');
+    dom.spinToggle = document.getElementById('spinToggle');
 }
 
 export function switchTab(tabIndex, state, renderCallbacks) {
@@ -52,12 +55,16 @@ export function switchTab(tabIndex, state, renderCallbacks) {
     if (tabIndex === 3) renderCallbacks.renderLibraryPage();
 }
 
-export function updatePlayButtonState(isPlaying) {
+export function updatePlayButtonState(isPlaying, albumArtSpin) {
     const playIcon = isPlaying
         ? '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
         : '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     if (dom.playBtn) dom.playBtn.innerHTML = playIcon;
     if (dom.miniPlayBtn) dom.miniPlayBtn.innerHTML = playIcon;
+
+    if (dom.artwork) {
+        dom.artwork.classList.toggle('spinning', isPlaying && albumArtSpin);
+    }
 }
 
 export function updatePlayerUI(track, activeQueue, trackIndex) {
