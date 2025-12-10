@@ -45,8 +45,12 @@ export async function fetchArtistWhitelist() {
 
         for (let i = 0; i < channelIds.length; i += chunkSize) {
             const chunk = channelIds.slice(i, i + chunkSize);
-            const channelData = await fetchFromProxy('channels', `part=snippet&id=${chunk.join(',')}`);
-            allChannelItems.push(...channelData.items);
+            if (chunk.length > 0) {
+                const channelData = await fetchFromProxy('channels', `part=snippet&id=${chunk.join(',')}`);
+                if (channelData.items) {
+                    allChannelItems.push(...channelData.items);
+                }
+            }
         }
 
         const artistsWithAvatars = artists.map(artist => {
