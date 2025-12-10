@@ -38,6 +38,9 @@ export async function fetchArtistWhitelist() {
     try {
         const { data: artists, error } = await supabase.from('artists').select('*');
         if (error) throw error;
+        if (!artists || artists.length === 0) {
+            return [];
+        }
 
         const allChannelItems = [];
         const channelIds = artists.map(a => a.channel_id);
