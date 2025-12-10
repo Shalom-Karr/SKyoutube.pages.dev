@@ -1,0 +1,16 @@
+{
+  "name": "SK Music",
+  "short_name": "SK Music",
+  "description": "Stream music from whitelisted artists - A modern PWA music player",
+  "start_url": "/music/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "https://zemer.io/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

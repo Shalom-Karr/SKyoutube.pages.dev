@@ -1,61 +1,110 @@
-// netlify/functions/youtube-proxy.js
+// netlify/functions/youtubeproxy.js
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 
-// This function handles YouTube API requests for Netlify deployments.
-// It uses the YOUTUBE_API_KEY stored securely in Netlify environment variables.
+// --- NEW FUNCTION TO GENERATE SQL ---
+async function generateArtistSql(apiKey) {
+    const artistFilePath = path.join(__dirname, '..', '..', 'artist_names.txt');
+    const sqlFilePath = path.join(__dirname, '..', '..', 'artists.sql');
+    const TABLE_NAME = 'artists';
 
-exports.handler = async (event, context) => {
-    // 1. Get the API Key from environment variables
-    const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+    try {
+        const artistNames = fs.readFileSync(artistFilePath, 'utf-8').split('\n').filter(Boolean);
+        console.log(`Found ${artistNames.length} artists.`);
 
-    if (!YOUTUBE_API_KEY) {
-        console.error("YOUTUBE_API_KEY is missing in Netlify environment variables.");
+        let sqlStatements = [];
+        for (const artistName of artistNames) {
+            const sanitizedName = artistName.replace(/'/g, "''").trim();
+            if (!sanitizedName) continue;
+
+            const youtubeUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(sanitizedName)}&type=channel&maxResults=1&key=${apiKey}`;
+
+            try {
+                const response = await fetch(youtubeUrl);
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    const channelId = data.items[0].id.channelId;
+                    const channelTitle = data.items[0].snippet.title;
+                    console.log(`Found channel for '${sanitizedName}': '${channelTitle}' (ID: ${channelId})`);
+                    sqlStatements.push(`INSERT INTO ${TABLE_NAME} (name, channel_id) VALUES ('${sanitizedName}', '${channelId}');`);
+                } else {
+                    console.log(`-> No channel found for '${sanitizedName}'. Skipping.`);
+                }
+            } catch (error) {
+                console.error(`Error fetching channel for '${sanitizedName}':`, error);
+            }
+        }
+
+        fs.writeFileSync(sqlFilePath, sqlStatements.join('\n'), 'utf-8');
+        console.log(`\n✅ Successfully generated '${sqlFilePath}' with ${sqlStatements.length} artists.`);
+        return {
+            statusCode: 200,
+            body: `SQL file generated with ${sqlStatements.length} artists.`
+        };
+
+    } catch (error) {
+        console.error('Error generating SQL file:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: "Server configuration error: API Key missing." })
+            body: JSON.stringify({ error: 'Failed to generate SQL file.' })
+        };
+    }
+}
+
+
+exports.handler = async function(event, context) {
+    const YOUTUBE_API_KEY = "AIzaSyDpJwIbEiVo5jkw79G92eUKpHSV6U4_vnc";
+
+    if (!YOUTUBE_API_KEY) {
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Server configuration error: API Key missing.' }),
         };
     }
 
-    // 2. Extract parameters passed from the client
+    // --- TEMPORARY: Trigger SQL Generation ---
+    if (event.queryStringParameters.generate_sql === 'true') {
+        return generateArtistSql(YOUTUBE_API_KEY);
+    }
+
+
     const { endpoint, params } = event.queryStringParameters;
-    
+
     if (!endpoint) {
         return {
             statusCode: 400,
-            body: JSON.stringify({ error: "Missing 'endpoint' parameter." })
+            body: JSON.stringify({ error: "Missing 'endpoint' parameter." }),
         };
     }
 
-    // 3. Construct the full YouTube API URL
     let youtubeUrl = `https://www.googleapis.com/youtube/v3/${endpoint}?key=${YOUTUBE_API_KEY}`;
-    
     if (params) {
         youtubeUrl += `&${params}`;
     }
 
     try {
-        // 4. Make the secure API call
         const response = await fetch(youtubeUrl);
         const data = await response.json();
-        
-        // 5. Check for YouTube API errors
+
         if (data.error) {
-            console.error(`YouTube API Error via Netlify proxy (${endpoint}):`, data.error.message);
+            console.error(`YouTube API Error (${endpoint}):`, data.error.message);
             return {
                 statusCode: response.status,
-                body: JSON.stringify({ error: data.error.message || "YouTube API call failed." })
+                body: JSON.stringify({ error: data.error.message || 'YouTube API call failed.' }),
             };
         }
 
-        // 6. Return data to the client
         return {
             statusCode: 200,
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
         };
     } catch (error) {
-        console.error("Netlify Proxy Fetch Error:", error);
+        console.error('Proxy Fetch Error:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: "Failed to connect to YouTube API via proxy." })
+            body: JSON.stringify({ error: 'Failed to connect to YouTube API via proxy.' }),
         };
     }
 };
