@@ -42,8 +42,14 @@ export async function fetchArtistWhitelist() {
             return [];
         }
 
+        const validArtists = artists.filter(artist => artist.channel_id);
+
+        if (validArtists.length === 0) {
+            return [];
+        }
+
         const allChannelItems = [];
-        const channelIds = artists.map(a => a.channel_id);
+        const channelIds = validArtists.map(a => a.channel_id);
         const chunkSize = 50;
 
         for (let i = 0; i < channelIds.length; i += chunkSize) {
@@ -56,7 +62,7 @@ export async function fetchArtistWhitelist() {
             }
         }
 
-        const artistsWithAvatars = artists.map(artist => {
+        const artistsWithAvatars = validArtists.map(artist => {
             const channel = allChannelItems.find(c => c.id === artist.channel_id);
             return {
                 ...artist,
