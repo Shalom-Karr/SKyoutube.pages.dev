@@ -143,11 +143,17 @@ export function renderArtists(artistWhitelist, onArtistClick) {
     artistWhitelist.forEach(artist => {
         const artistCard = document.createElement('div');
         artistCard.className = 'artist-card';
+        // Ensure artist.name exists before trying to access its properties.
+        const artistName = artist.name || 'Unnamed Artist';
+        const artistAvatar = artist.avatar ?
+            `<img src="${artist.avatar}" alt="${artistName}">` :
+            `<div class="artist-avatar-placeholder">${artistName.charAt(0)}</div>`;
+
         artistCard.innerHTML = `
             <div class="artist-avatar">
-                ${artist.avatar ? `<img src="${artist.avatar}" alt="${artist.name}">` : `<div class="artist-avatar-placeholder">${artist.name.charAt(0)}</div>`}
+                ${artistAvatar}
             </div>
-            <div class="artist-name">${artist.name}</div>
+            <div class="artist-name">${artistName}</div>
         `;
         artistCard.addEventListener('click', () => onArtistClick(artist));
         grid.appendChild(artistCard);

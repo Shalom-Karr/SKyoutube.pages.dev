@@ -29,6 +29,20 @@ export async function fetchFromProxy(endpoint, params) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`YouTube API Error: ${response.status}`);
     const data = await response.json();
+
+    // Ensure all thumbnail URLs are HTTPS
+    if (data.items) {
+        data.items.forEach(item => {
+            if (item.snippet && item.snippet.thumbnails) {
+                for (const key in item.snippet.thumbnails) {
+                    if (item.snippet.thumbnails[key].url) {
+                        item.snippet.thumbnails[key].url = item.snippet.thumbnails[key].url.replace(/^http:/, 'https');
+                    }
+                }
+            }
+        });
+    }
+
     setCachedData(url, data);
     return data;
 }
@@ -39,7 +53,7 @@ export async function fetchArtistWhitelist() {
     if (cached) return cached;
 
     try {
-        const { data: artists, error } = await supabase.from('artists').select('channel_id');
+        const { data: artists, error } = await supabase.from('artists').select('name, channel_id');
         if (error) throw error;
         if (!artists || artists.length === 0) {
             return [];

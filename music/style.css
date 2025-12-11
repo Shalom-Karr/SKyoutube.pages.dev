@@ -150,6 +150,12 @@ body {
     z-index: 100;
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
 #pageTitle {
     font-size: 1.75rem;
     font-weight: 700;
