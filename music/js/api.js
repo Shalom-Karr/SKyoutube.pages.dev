@@ -29,13 +29,26 @@ function setCachedData(key, data) {
         localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
     } catch (e) {
         if (e.name === 'QuotaExceededError') {
-            console.warn('Cache quota exceeded. Evicting least recently used items.');
-            evictCache();
-            // Retry setting the item after eviction
+            console.warn('Cache quota exceeded. Starting progressive eviction.');
+
+            // Stage 1: Evict 80% of the cache and retry
             try {
+                evictCache(0.8);
                 localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+                console.log("Successfully set cache item after partial eviction.");
+                return;
             } catch (e2) {
-                console.error("Failed to set cache item even after eviction:", e2);
+                console.warn("Partial eviction insufficient. Clearing entire API cache.");
+
+                // Stage 2: Clear the entire API cache and retry
+                try {
+                    clearApiCache();
+                    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+                    console.log("Successfully set cache item after full cache clear.");
+                } catch (e3) {
+                    console.error("Failed to set cache item even after clearing entire cache:", e3);
+                    // At this point, the item is likely too large for localStorage.
+                }
             }
         } else {
             console.error("Failed to set cache item:", e);
@@ -43,7 +56,7 @@ function setCachedData(key, data) {
     }
 }
 
-function evictCache() {
+function evictCache(percentage = 0.2) {
     let items = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -61,11 +74,21 @@ function evictCache() {
     // Sort by timestamp, oldest first
     items.sort((a, b) => a.timestamp - b.timestamp);
 
-    // Remove the oldest 20% of the cache
-    const itemsToRemove = Math.ceil(items.length * 0.2);
+    // Remove the oldest percentage of the cache
+    const itemsToRemove = Math.ceil(items.length * percentage);
     for (let i = 0; i < itemsToRemove; i++) {
         console.log(`Evicting ${items[i].key} from cache.`);
         localStorage.removeItem(items[i].key);
+    }
+}
+
+function clearApiCache() {
+    console.warn("Clearing the entire API cache.");
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key.startsWith(CACHE_PREFIX)) {
+            localStorage.removeItem(key);
+        }
     }
 }
 
