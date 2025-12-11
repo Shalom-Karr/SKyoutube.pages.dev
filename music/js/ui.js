@@ -1,5 +1,5 @@
 
-import { setQueue, setTrackIndex, loadVideo } from './player.js';
+import { setTrackIndex, loadVideo } from './player.js';
 
 let dom = {};
 
@@ -119,14 +119,14 @@ function renderUpNext(activeQueue, trackIndex) {
     });
 }
 
-export function renderHomePage(recentlyPlayed) {
+export function renderHomePage(recentlyPlayed, onTrackClick) {
     if (!dom.homeContent) return;
     dom.homeContent.innerHTML = '<h2>Recently Played</h2>';
     if (recentlyPlayed.length > 0) {
         const grid = document.createElement('div');
         grid.className = 'artists-grid';
         recentlyPlayed.forEach(track => {
-            const card = createTrackCard(track, recentlyPlayed);
+            const card = createTrackCard(track, recentlyPlayed, onTrackClick);
             grid.appendChild(card);
         });
         dom.homeContent.appendChild(grid);
@@ -161,19 +161,19 @@ export function renderArtists(artistWhitelist, onArtistClick) {
     dom.artistsContent.appendChild(grid);
 }
 
-export function renderArtistSongs(artist, songs) {
+export function renderArtistSongs(artist, songs, onTrackClick) {
     dom.pageTitle.textContent = artist.name;
     dom.artistsContent.innerHTML = ''; // Clear artist grid
     const list = document.createElement('div');
     list.className = 'song-list';
     songs.forEach((song, index) => {
-        const item = createTrackListItem(song, songs, index);
+        const item = createTrackListItem(song, songs, index, onTrackClick);
         list.appendChild(item);
     });
     dom.artistsContent.appendChild(list);
 }
 
-export function renderSearchResults(results) {
+export function renderSearchResults(results, onTrackClick) {
     dom.searchContent.innerHTML = '';
     if (results.length === 0) {
         dom.searchContent.innerHTML = '<p>No results found.</p>';
@@ -182,13 +182,13 @@ export function renderSearchResults(results) {
     const list = document.createElement('div');
     list.className = 'song-list';
     results.forEach((song, index) => {
-        const item = createTrackListItem(song, results, index);
+        const item = createTrackListItem(song, results, index, onTrackClick);
         list.appendChild(item);
     });
     dom.searchContent.appendChild(list);
 }
 
-export function renderLibraryPage(playlists, favorites, saveQueueCallback) {
+export function renderLibraryPage(playlists, favorites, saveQueueCallback, onTrackClick) {
     if (!dom.libraryContent) return;
     dom.libraryContent.innerHTML = `
         <div class="library-actions">
@@ -208,7 +208,7 @@ export function renderLibraryPage(playlists, favorites, saveQueueCallback) {
         const list = document.createElement('div');
         list.className = 'song-list';
         playlists.forEach(p => {
-            const item = createPlaylistListItem(p);
+            const item = createPlaylistListItem(p, onTrackClick);
             list.appendChild(item);
         });
         playlistsContainer.appendChild(list);
@@ -219,14 +219,14 @@ export function renderLibraryPage(playlists, favorites, saveQueueCallback) {
         const list = document.createElement('div');
         list.className = 'song-list';
         favorites.forEach((track, index) => {
-            const item = createTrackListItem(track, favorites, index);
+            const item = createTrackListItem(track, favorites, index, onTrackClick);
             list.appendChild(item);
         });
         favoritesContainer.appendChild(list);
     }
 }
 
-function createPlaylistListItem(playlist) {
+function createPlaylistListItem(playlist, onTrackClick) {
     const item = document.createElement('div');
     item.className = 'list-item';
     item.innerHTML = `
@@ -235,11 +235,11 @@ function createPlaylistListItem(playlist) {
             <div class="list-sub">${playlist.tracks.length} songs</div>
         </div>
     `;
-    item.addEventListener('click', () => setQueue(playlist.tracks, 0));
+    item.addEventListener('click', () => onTrackClick(playlist.tracks, 0));
     return item;
 }
 
-function createTrackCard(track, queue) {
+function createTrackCard(track, queue, onTrackClick) {
     const card = document.createElement('div');
     card.className = 'artist-card';
     card.innerHTML = `
@@ -249,11 +249,11 @@ function createTrackCard(track, queue) {
         <div class="artist-name">${track.title}</div>
         <div class="artist-subtitle">${track.artist}</div>
     `;
-    card.addEventListener('click', () => setQueue(queue, queue.findIndex(t => t.videoId === track.videoId)));
+    card.addEventListener('click', () => onTrackClick(queue, queue.findIndex(t => t.videoId === track.videoId)));
     return card;
 }
 
-function createTrackListItem(track, queue, index) {
+function createTrackListItem(track, queue, index, onTrackClick) {
     const item = document.createElement('div');
     item.className = 'list-item';
     item.innerHTML = `
@@ -263,7 +263,7 @@ function createTrackListItem(track, queue, index) {
             <div class="list-sub">${track.artist}</div>
         </div>
     `;
-    item.addEventListener('click', () => setQueue(queue, index));
+    item.addEventListener('click', () => onTrackClick(queue, index));
     return item;
 }
 

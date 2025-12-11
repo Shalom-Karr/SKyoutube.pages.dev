@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     UI.cacheDOM();
 
+    function onTrackClick(queue, index) {
+        Player.setQueue(queue, index);
+    }
+
     function onPlayerStateChange(event) {
         const isPlaying = event.data === YT.PlayerState.PLAYING;
         UI.updatePlayButtonState(isPlaying, state.settings.albumArtSpin);
@@ -112,10 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 artist: item.snippet.channelTitle,
                 thumbnail: item.snippet.thumbnails.high.url,
             }));
-            UI.renderArtistSongs(artist, songs);
+            UI.renderArtistSongs(artist, songs, onTrackClick);
         } catch (error) {
             console.error('Error fetching artist songs:', error);
-            artistsContent.innerHTML = `<p>Error loading songs.</p>`;
+            UI.renderArtistSongs(artist, [], onTrackClick);
         }
     }
 
@@ -167,15 +171,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     artist: item.snippet.channelTitle,
                     thumbnail: item.snippet.thumbnails.high.url,
                 }));
-            UI.renderSearchResults(results);
+            UI.renderSearchResults(results, onTrackClick);
         } catch (error) {
             console.error('Search Error:', error);
-            searchContent.innerHTML = '<p>Search failed to load.</p>';
+            UI.renderSearchResults([], onTrackClick);
         }
     }
 
     function renderHomePage() {
-        UI.renderHomePage(state.recentlyPlayed);
+        UI.renderHomePage(state.recentlyPlayed, onTrackClick);
     }
 
     function renderArtists() {
@@ -183,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderLibraryPage() {
-        UI.renderLibraryPage(state.playlists, state.favorites, saveQueueAsPlaylist);
+        UI.renderLibraryPage(state.playlists, state.favorites, saveQueueAsPlaylist, onTrackClick);
     }
 
     function bindEventListeners() {
@@ -248,7 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         document.documentElement.setAttribute('data-theme', state.theme);
         Player.initYouTubePlayer(null, onPlayerStateChange);
-        state.artistWhitelist = await fetchArtistWhitelist();
+        let artistData = await fetchArtistWhitelist();
+        state.artistWhitelist = artistData;
+
         document.getElementById('spinToggle').checked = state.settings.albumArtSpin;
         renderHomePage();
         bindEventListeners();

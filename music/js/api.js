@@ -2,21 +2,73 @@
 import { supabase } from '../supabase-client.js';
 
 const CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 hours
+const CACHE_PREFIX = 'api_cache_';
 
 async function getCachedData(key) {
-    const cached = localStorage.getItem(key);
+    const cached = localStorage.getItem(CACHE_PREFIX + key);
     if (cached) {
-        const { timestamp, data } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-            return data;
+        try {
+            const { timestamp, data } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                // Update timestamp to mark as recently used
+                const updatedItem = JSON.stringify({ timestamp: Date.now(), data });
+                localStorage.setItem(CACHE_PREFIX + key, updatedItem);
+                return data;
+            }
+        } catch (e) {
+            console.error("Error parsing cache data, ignoring.", e);
+            localStorage.removeItem(CACHE_PREFIX + key);
         }
     }
     return null;
 }
 
 function setCachedData(key, data) {
-    localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), data }));
+    const item = { timestamp: Date.now(), data };
+    try {
+        localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            console.warn('Cache quota exceeded. Evicting least recently used items.');
+            evictCache();
+            // Retry setting the item after eviction
+            try {
+                localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(item));
+            } catch (e2) {
+                console.error("Failed to set cache item even after eviction:", e2);
+            }
+        } else {
+            console.error("Failed to set cache item:", e);
+        }
+    }
 }
+
+function evictCache() {
+    let items = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith(CACHE_PREFIX)) {
+            try {
+                const item = JSON.parse(localStorage.getItem(key));
+                items.push({ key, timestamp: item.timestamp || 0 });
+            } catch (e) {
+                // Invalid item, remove it
+                localStorage.removeItem(key);
+            }
+        }
+    }
+
+    // Sort by timestamp, oldest first
+    items.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Remove the oldest 20% of the cache
+    const itemsToRemove = Math.ceil(items.length * 0.2);
+    for (let i = 0; i < itemsToRemove; i++) {
+        console.log(`Evicting ${items[i].key} from cache.`);
+        localStorage.removeItem(items[i].key);
+    }
+}
+
 
 export async function fetchFromProxy(endpoint, params) {
     // Correctly encode the parameters
@@ -71,9 +123,15 @@ export async function fetchArtistWhitelist() {
 
         const artistsWithAvatars = artists.map(artist => {
             const channel = allChannelItems.find(c => c.id === artist.channel_id);
+            let avatarUrl = channel ? channel.snippet.thumbnails.default.url : null;
+            if (avatarUrl && avatarUrl.startsWith('//')) {
+                avatarUrl = 'https:' + avatarUrl;
+            } else if (avatarUrl) {
+                avatarUrl = avatarUrl.replace(/^http:/, 'https');
+            }
             return {
                 ...artist,
-                avatar: channel ? channel.snippet.thumbnails.default.url : null,
+                avatar: avatarUrl,
             };
         });
 
