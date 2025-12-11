@@ -29,20 +29,6 @@ export async function fetchFromProxy(endpoint, params) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`YouTube API Error: ${response.status}`);
     const data = await response.json();
-
-    // Ensure all thumbnail URLs are HTTPS
-    if (data.items) {
-        data.items.forEach(item => {
-            if (item.snippet && item.snippet.thumbnails) {
-                for (const key in item.snippet.thumbnails) {
-                    if (item.snippet.thumbnails[key].url) {
-                        item.snippet.thumbnails[key].url = item.snippet.thumbnails[key].url.replace(/^http:/, 'https');
-                    }
-                }
-            }
-        });
-    }
-
     setCachedData(url, data);
     return data;
 }
@@ -97,4 +83,26 @@ export async function fetchArtistWhitelist() {
         console.error('Error fetching artist whitelist:', error);
         return [];
     }
+}
+
+function getBestThumbnail(thumbnails) {
+    if (!thumbnails) return 'https://via.placeholder.com/150';
+    const preferredOrder = ['high', 'medium', 'default'];
+    for (const quality of preferredOrder) {
+        if (thumbnails[quality] && thumbnails[quality].url) {
+            return thumbnails[quality].url.replace(/^http:/, 'https');
+        }
+    }
+    return 'https://via.placeholder.com/150';
+}
+
+export function parseYoutubeItem(item) {
+    if (!item || !item.snippet) return null;
+
+    return {
+        videoId: item.id.videoId,
+        title: item.snippet.title,
+        artist: item.snippet.channelTitle,
+        thumbnail: getBestThumbnail(item.snippet.thumbnails),
+    };
 }

@@ -9,8 +9,13 @@
   "icons": [
     {
       "src": "https://zemer.io/favicon.ico",
-      "sizes": "any",
+      "sizes": "48x48",
       "type": "image/x-icon"
+    },
+    {
+      "src": "https://zemer.io/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
     }
   ]
 }
