@@ -19,7 +19,10 @@ function setCachedData(key, data) {
 }
 
 export async function fetchFromProxy(endpoint, params) {
-    const url = `/.netlify/functions/youtubeproxy?endpoint=${endpoint}&${params}`;
+    // Correctly encode the parameters
+    const queryString = new URLSearchParams(params).toString();
+    const url = `/.netlify/functions/api/youtubeproxy?endpoint=${endpoint}&${queryString}`;
+
     const cached = await getCachedData(url);
     if (cached) return cached;
 
@@ -36,33 +39,37 @@ export async function fetchArtistWhitelist() {
     if (cached) return cached;
 
     try {
-        const { data: artists, error } = await supabase.from('artists').select('*');
+        const { data: artists, error } = await supabase.from('artists').select('channel_id');
         if (error) throw error;
         if (!artists || artists.length === 0) {
             return [];
         }
 
-        const validArtists = artists.filter(artist => artist.channel_id);
+        const channelIds = artists
+            .map(a => a.channel_id)
+            .filter(id => id && id.trim() !== ''); // Ensure no null, undefined, or empty strings
 
-        if (validArtists.length === 0) {
+        if (channelIds.length === 0) {
             return [];
         }
 
         const allChannelItems = [];
-        const channelIds = validArtists.map(a => a.channel_id);
         const chunkSize = 50;
 
         for (let i = 0; i < channelIds.length; i += chunkSize) {
             const chunk = channelIds.slice(i, i + chunkSize);
-            if (chunk.length > 0) {
-                const channelData = await fetchFromProxy('channels', `part=snippet&id=${chunk.join(',')}`);
-                if (channelData.items) {
-                    allChannelItems.push(...channelData.items);
-                }
+
+            const channelData = await fetchFromProxy('channels', {
+                part: 'snippet',
+                id: chunk.join(','),
+            });
+
+            if (channelData && channelData.items) {
+                allChannelItems.push(...channelData.items);
             }
         }
 
-        const artistsWithAvatars = validArtists.map(artist => {
+        const artistsWithAvatars = artists.map(artist => {
             const channel = allChannelItems.find(c => c.id === artist.channel_id);
             return {
                 ...artist,
