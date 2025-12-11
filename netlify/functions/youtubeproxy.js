@@ -70,7 +70,8 @@ exports.handler = async function(event, context) {
     }
 
 
-    const { endpoint, params } = event.queryStringParameters;
+    const queryParams = event.queryStringParameters;
+    const endpoint = queryParams.endpoint;
 
     if (!endpoint) {
         return {
@@ -79,10 +80,12 @@ exports.handler = async function(event, context) {
         };
     }
 
-    let youtubeUrl = `https://www.googleapis.com/youtube/v3/${endpoint}?key=${YOUTUBE_API_KEY}`;
-    if (params) {
-        youtubeUrl += `&${params}`;
-    }
+    // The 'endpoint' parameter is for our function's routing, not for the YouTube API.
+    // We remove it and forward everything else.
+    delete queryParams.endpoint;
+
+    const forwardedParams = new URLSearchParams(queryParams).toString();
+    const youtubeUrl = `https://www.googleapis.com/youtube/v3/${endpoint}?key=${YOUTUBE_API_KEY}&${forwardedParams}`;
 
     try {
         const response = await fetch(youtubeUrl);
