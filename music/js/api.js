@@ -21,7 +21,7 @@ function setCachedData(key, data) {
 export async function fetchFromProxy(endpoint, params) {
     // Correctly encode the parameters
     const queryString = new URLSearchParams(params).toString();
-    const url = `/.netlify/functions/api/youtubeproxy?endpoint=${endpoint}&${queryString}`;
+    const url = `/.netlify/functions/youtubeproxy?endpoint=${endpoint}&${queryString}`;
 
     const cached = await getCachedData(url);
     if (cached) return cached;
