@@ -109,36 +109,47 @@ export async function fetchFromProxy(endpoint, params) {
 }
 
 export async function fetchArtistWhitelist() {
-    const cacheKey = 'artistWhitelistWithAvatars';
-    const cached = await getCachedData(cacheKey);
-    if (cached) return cached;
+    const indexCacheKey = 'artist_whitelist_index';
+    const cachedIndex = await getCachedData(indexCacheKey);
 
+    if (cachedIndex) {
+        const artists = [];
+        for (const channelId of cachedIndex) {
+            const artistData = await getCachedData(`artist_detail_${channelId}`);
+            if (artistData) {
+                artists.push(artistData);
+            } else {
+                // If any artist is missing, the cache is stale. Fetch all.
+                console.warn(`Cache miss for artist ${channelId}. Refetching entire whitelist.`);
+                return await fetchAndCacheAllArtists();
+            }
+        }
+        return artists;
+    }
+
+    return await fetchAndCacheAllArtists();
+}
+
+async function fetchAndCacheAllArtists() {
     try {
         const { data: artists, error } = await supabase.from('artists').select('name, channel_id');
         if (error) throw error;
-        if (!artists || artists.length === 0) {
-            return [];
-        }
+        if (!artists || artists.length === 0) return [];
 
         const channelIds = artists
             .map(a => a.channel_id)
-            .filter(id => id && id.trim() !== ''); // Ensure no null, undefined, or empty strings
+            .filter(id => id && id.trim() !== '');
 
-        if (channelIds.length === 0) {
-            return [];
-        }
+        if (channelIds.length === 0) return [];
 
         const allChannelItems = [];
         const chunkSize = 50;
-
         for (let i = 0; i < channelIds.length; i += chunkSize) {
             const chunk = channelIds.slice(i, i + chunkSize);
-
             const channelData = await fetchFromProxy('channels', {
                 part: 'snippet',
                 id: chunk.join(','),
             });
-
             if (channelData && channelData.items) {
                 allChannelItems.push(...channelData.items);
             }
@@ -152,13 +163,16 @@ export async function fetchArtistWhitelist() {
             } else if (avatarUrl) {
                 avatarUrl = avatarUrl.replace(/^http:/, 'https:');
             }
-            return {
-                ...artist,
-                avatar: avatarUrl,
-            };
+            return { ...artist, avatar: avatarUrl };
         });
 
-        setCachedData(cacheKey, artistsWithAvatars);
+        // Cache each artist individually and the index
+        artistsWithAvatars.forEach(artist => {
+            setCachedData(`artist_detail_${artist.channel_id}`, artist);
+        });
+        const newIndex = artistsWithAvatars.map(a => a.channel_id);
+        setCachedData('artist_whitelist_index', newIndex);
+
         return artistsWithAvatars;
     } catch (error) {
         console.error('Error fetching artist whitelist:', error);
