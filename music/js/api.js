@@ -180,6 +180,45 @@ async function fetchAndCacheAllArtists() {
     }
 }
 
+export async function fetchArtistAlbums(channelId) {
+    try {
+        const data = await fetchFromProxy('search', {
+            part: 'snippet',
+            type: 'playlist',
+            channelId: channelId,
+            maxResults: 50
+        });
+        return data.items.map(item => ({
+            id: item.id.playlistId,
+            title: item.snippet.title,
+            thumbnail: getBestThumbnail(item.snippet.thumbnails),
+            artist: item.snippet.channelTitle
+        }));
+    } catch (error) {
+        console.error('Error fetching artist albums:', error);
+        return [];
+    }
+}
+
+export async function fetchPlaylistItems(playlistId) {
+    try {
+        const data = await fetchFromProxy('playlistItems', {
+            part: 'snippet',
+            playlistId: playlistId,
+            maxResults: 50
+        });
+        return data.items.map(item => ({
+            videoId: item.snippet.resourceId.videoId,
+            title: item.snippet.title,
+            artist: item.snippet.videoOwnerChannelTitle,
+            thumbnail: getBestThumbnail(item.snippet.thumbnails),
+        }));
+    } catch (error) {
+        console.error('Error fetching playlist items:', error);
+        return [];
+    }
+}
+
 function getBestThumbnail(thumbnails) {
     if (!thumbnails) return 'https://via.placeholder.com/150';
     const preferredOrder = ['high', 'medium', 'default'];

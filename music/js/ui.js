@@ -1,5 +1,5 @@
 
-import { setTrackIndex, loadVideo } from './player.js';
+import { setTrackIndex, loadVideo, getCurrentTrack } from './player.js';
 
 let dom = {};
 
@@ -81,6 +81,20 @@ export function updatePlayerUI(track, activeQueue, trackIndex) {
     dom.playerBackground.style.backgroundImage = `url(${thumbnailUrl})`;
 
     renderUpNext(activeQueue, trackIndex);
+
+    // Re-render the current view to update the now-playing indicator
+    const currentPage = document.querySelector('.page.active');
+    if (currentPage) {
+        const pageId = currentPage.id;
+        if (pageId === 'searchPage') {
+            const results = Array.from(dom.searchContent.querySelectorAll('.list-item')).map(item => {
+                // This is a bit of a hack to get the track data back
+                return activeQueue.find(t => t.title === item.querySelector('.list-title').textContent);
+            });
+            renderSearchResults(results, (q, i) => Player.setQueue(q, i));
+        }
+        // Add similar logic for other pages if needed
+    }
 }
 
 export function openFullPlayer() {
@@ -161,16 +175,42 @@ export function renderArtists(artistWhitelist, onArtistClick) {
     dom.artistsContent.appendChild(grid);
 }
 
-export function renderArtistSongs(artist, songs, onTrackClick) {
+export function renderArtistPage(artist, albums, songs, onTrackClick, onAlbumClick) {
     dom.pageTitle.textContent = artist.name;
     dom.artistsContent.innerHTML = ''; // Clear artist grid
-    const list = document.createElement('div');
-    list.className = 'song-list';
-    songs.forEach((song, index) => {
-        const item = createTrackListItem(song, songs, index, onTrackClick);
-        list.appendChild(item);
-    });
-    dom.artistsContent.appendChild(list);
+
+    if (albums.length > 0) {
+        const albumsGrid = document.createElement('div');
+        albumsGrid.className = 'artists-grid';
+        albums.forEach(album => {
+            const card = createAlbumCard(album, onAlbumClick);
+            albumsGrid.appendChild(card);
+        });
+        dom.artistsContent.appendChild(albumsGrid);
+    }
+
+    if (songs.length > 0) {
+        const songsList = document.createElement('div');
+        songsList.className = 'song-list';
+        songs.forEach((song, index) => {
+            const item = createTrackListItem(song, songs, index, onTrackClick);
+            songsList.appendChild(item);
+        });
+        dom.artistsContent.appendChild(songsList);
+    }
+}
+
+function createAlbumCard(album, onAlbumClick) {
+    const card = document.createElement('div');
+    card.className = 'artist-card';
+    card.innerHTML = `
+        <div class="artist-avatar">
+            <img src="${album.thumbnail}" alt="${album.title}">
+        </div>
+        <div class="artist-name">${album.title}</div>
+    `;
+    card.addEventListener('click', () => onAlbumClick(album));
+    return card;
 }
 
 export function renderSearchResults(results, onTrackClick) {
@@ -256,6 +296,12 @@ function createTrackCard(track, queue, onTrackClick) {
 function createTrackListItem(track, queue, index, onTrackClick) {
     const item = document.createElement('div');
     item.className = 'list-item';
+
+    const currentTrack = getCurrentTrack();
+    if (currentTrack && currentTrack.videoId === track.videoId) {
+        item.classList.add('now-playing');
+    }
+
     item.innerHTML = `
         <div class="list-thumb"><img src="${track.thumbnail}" alt="${track.title}"></div>
         <div class="list-info">

@@ -294,6 +294,22 @@ body {
     color: var(--text-muted);
 }
 
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-left-color: var(--accent-secondary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
 .player-controls {
     display: flex;
     justify-content: space-around;
@@ -384,6 +400,11 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill,minmax(160px,1fr));
     gap: 24px;
+    margin-bottom: 32px;
+}
+
+#artistsContent h2 {
+    margin-bottom: 16px;
 }
 
 .artist-card {
@@ -453,6 +474,17 @@ body {
 }
 .list-sub {
     color: var(--text-secondary);
+}
+
+.list-item.now-playing .list-title {
+    font-weight: 700;
+    color: var(--accent-secondary);
+}
+
+.list-item.now-playing .list-info::after {
+    content: '♫';
+    margin-left: 8px;
+    color: var(--accent-secondary);
 }
 
 /* --- Up Next --- */

@@ -1,5 +1,5 @@
 
-import { fetchArtistWhitelist, fetchFromProxy } from './api.js';
+import { fetchArtistWhitelist, fetchFromProxy, parseYoutubeItem, fetchArtistAlbums, fetchPlaylistItems } from './api.js';
 import * as Player from './player.js';
 import * as UI from './ui.js';
 
@@ -105,21 +105,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function fetchArtistSongs(artist) {
+    async function fetchArtistDetails(artist) {
         const artistsContent = document.getElementById('artistsContent');
         UI.setLoading(artistsContent, true);
         try {
-            const data = await fetchFromProxy('search', `part=snippet&type=video&maxResults=50&channelId=${artist.channel_id}`);
-            const songs = data.items.map(item => ({
-                videoId: item.id.videoId,
-                title: item.snippet.title,
-                artist: item.snippet.channelTitle,
-                thumbnail: item.snippet.thumbnails.high.url,
-            }));
-            UI.renderArtistSongs(artist, songs, onTrackClick);
+            const [songsData, albumsData] = await Promise.all([
+                fetchFromProxy('search', `part=snippet&type=video&maxResults=50&channelId=${artist.channel_id}`),
+                fetchArtistAlbums(artist.channel_id)
+            ]);
+
+            const songs = songsData.items.map(parseYoutubeItem).filter(Boolean);
+            UI.renderArtistPage(artist, albumsData, songs, onTrackClick, onAlbumClick);
         } catch (error) {
-            console.error('Error fetching artist songs:', error);
-            UI.renderArtistSongs(artist, [], onTrackClick);
+            console.error('Error fetching artist details:', error);
+            UI.renderArtistPage(artist, [], [], onTrackClick, onAlbumClick);
+        }
+    }
+
+    async function onAlbumClick(album) {
+        const artistsContent = document.getElementById('artistsContent');
+        UI.setLoading(artistsContent, true);
+        try {
+            const songs = await fetchPlaylistItems(album.id);
+            Player.setQueue(songs, 0);
+        } catch (error) {
+            console.error('Error fetching album tracks:', error);
         }
     }
 
@@ -165,12 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const whitelistedIds = new Set(state.artistWhitelist.map(a => a.channel_id));
             const results = data.items
                 .filter(item => whitelistedIds.has(item.snippet.channelId))
-                .map(item => ({
-                    videoId: item.id.videoId,
-                    title: item.snippet.title,
-                    artist: item.snippet.channelTitle,
-                    thumbnail: item.snippet.thumbnails.high.url,
-                }));
+                .map(parseYoutubeItem)
+                .filter(Boolean); // Filter out any null results from parsing
             UI.renderSearchResults(results, onTrackClick);
         } catch (error) {
             console.error('Search Error:', error);
@@ -183,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderArtists() {
-        UI.renderArtists(state.artistWhitelist, fetchArtistSongs);
+        UI.renderArtists(state.artistWhitelist, fetchArtistDetails);
     }
 
     function renderLibraryPage() {
