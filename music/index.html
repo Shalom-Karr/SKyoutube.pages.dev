@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Stream music from whitelisted artists - A modern PWA music player">
     <title>SK Music</title>
-    <link rel="icon" type="image/x-icon" href="https://zemer.io/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="/music/manifest.webmanifest">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
@@ -40,6 +40,12 @@
           <span>Library</span>
         </button>
       </nav>
+      <div id="sidebarPlayer" class="sidebar-player">
+        <div id="sidebarPlayerThumb" class="sidebar-player-thumb"></div>
+        <div class="sidebar-player-info">
+            <div id="sidebarPlayerTitle" class="sidebar-player-title">No song selected</div>
+        </div>
+      </div>
     </aside>
 
     <div class="main-container">
@@ -122,6 +128,7 @@
 
     <div id="yt-player" style="position: fixed; top: -9999px; left: -9999px;"></div>
   </div>
+  <div id="toast" class="toast"></div>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

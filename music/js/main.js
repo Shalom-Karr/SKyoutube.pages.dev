@@ -32,9 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isPlaying) {
             startProgressUpdates();
-            const playerState = Player.getPlayerState();
-            UI.updatePlayerUI(Player.getCurrentTrack(), Player.getActiveQueue(), playerState.trackIndex);
-            addRecentlyPlayed(Player.getCurrentTrack());
         } else {
             stopProgressUpdates();
         }
@@ -42,6 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.data === YT.PlayerState.ENDED) {
             Player.playNext(true);
         }
+    }
+
+    function onTrackChange(track, queue, index) {
+        if (!track) return;
+        UI.updatePlayerUI(track, queue, index);
+        UI.updateNowPlayingIndicator(track.videoId);
+        addRecentlyPlayed(track);
     }
 
     function startProgressUpdates() {
@@ -85,11 +89,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const isFavorite = state.favorites.some(t => t.videoId === track.videoId);
         if (isFavorite) {
             state.favorites = state.favorites.filter(t => t.videoId !== track.videoId);
+            UI.showToast('Removed from Favorites');
         } else {
             state.favorites = [track, ...state.favorites];
+            UI.showToast('Added to Favorites');
         }
         localStorage.setItem('favorites', JSON.stringify(state.favorites));
-        renderLibraryPage();
+        if (state.currentPage === 3) {
+            renderLibraryPage();
+        }
     }
 
     function saveQueueAsPlaylist() {
@@ -115,10 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             const songs = songsData.items.map(parseYoutubeItem).filter(Boolean);
-            UI.renderArtistPage(artist, albumsData, songs, onTrackClick, onAlbumClick);
+            UI.renderArtistPage(artist, albumsData, songs, onTrackClick, onAlbumClick, state.favorites, toggleFavorite);
         } catch (error) {
             console.error('Error fetching artist details:', error);
-            UI.renderArtistPage(artist, [], [], onTrackClick, onAlbumClick);
+            UI.renderError(artistsContent, 'Could not load artist details. Please try again later.');
         }
     }
 
@@ -127,14 +135,16 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.setLoading(artistsContent, true);
         try {
             const songs = await fetchPlaylistItems(album.id);
-            Player.setQueue(songs, 0);
+            UI.renderAlbumTracklist(album, songs, onTrackClick, state.favorites, toggleFavorite);
         } catch (error) {
             console.error('Error fetching album tracks:', error);
+            UI.renderError(artistsContent, 'Could not load album. Please try again later.');
         }
     }
 
     async function shuffleAll() {
-        UI.setLoading(document.getElementById('homeContent'), true);
+        const homeContent = document.getElementById('homeContent');
+        UI.setLoading(homeContent, true);
         let allSongs = [];
         try {
             for (const artist of state.artistWhitelist) {
@@ -158,8 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error during Shuffle All:', error);
+            UI.renderError(homeContent, 'Could not shuffle all. Please try again later.');
         } finally {
-            UI.setLoading(document.getElementById('homeContent'), false);
             renderHomePage();
         }
     }
@@ -177,10 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 .filter(item => whitelistedIds.has(item.snippet.channelId))
                 .map(parseYoutubeItem)
                 .filter(Boolean); // Filter out any null results from parsing
-            UI.renderSearchResults(results, onTrackClick);
+            UI.renderSearchResults(results, onTrackClick, state.favorites, toggleFavorite);
         } catch (error) {
             console.error('Search Error:', error);
-            UI.renderSearchResults([], onTrackClick);
+            UI.renderError(searchContent, 'Search failed. Please try again later.');
         }
     }
 
@@ -193,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderLibraryPage() {
-        UI.renderLibraryPage(state.playlists, state.favorites, saveQueueAsPlaylist, onTrackClick);
+        UI.renderLibraryPage(state.playlists, state.favorites, saveQueueAsPlaylist, onTrackClick, toggleFavorite);
     }
 
     function bindEventListeners() {
@@ -257,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function init() {
         document.documentElement.setAttribute('data-theme', state.theme);
-        Player.initYouTubePlayer(null, onPlayerStateChange);
+        Player.initYouTubePlayer(null, onPlayerStateChange, onTrackChange);
         let artistData = await fetchArtistWhitelist();
         state.artistWhitelist = artistData;
 
