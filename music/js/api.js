@@ -150,7 +150,7 @@ export async function fetchArtistWhitelist() {
             if (avatarUrl && avatarUrl.startsWith('//')) {
                 avatarUrl = 'https:' + avatarUrl;
             } else if (avatarUrl) {
-                avatarUrl = avatarUrl.replace(/^http:/, 'https');
+                avatarUrl = avatarUrl.replace(/^http:/, 'https:');
             }
             return {
                 ...artist,
@@ -171,7 +171,7 @@ function getBestThumbnail(thumbnails) {
     const preferredOrder = ['high', 'medium', 'default'];
     for (const quality of preferredOrder) {
         if (thumbnails[quality] && thumbnails[quality].url) {
-            return thumbnails[quality].url.replace(/^http:/, 'https');
+            return thumbnails[quality].url.replace(/^http:/, 'https:');
         }
     }
     return 'https://via.placeholder.com/150';
