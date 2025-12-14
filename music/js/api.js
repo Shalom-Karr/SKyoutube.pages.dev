@@ -108,75 +108,63 @@ export async function fetchFromProxy(endpoint, params) {
     return data;
 }
 
-export async function fetchArtistWhitelist() {
-    const indexCacheKey = 'artist_whitelist_index';
-    const cachedIndex = await getCachedData(indexCacheKey);
+// New Strategy: Fetch and cache only the basic artist list (index) initially.
+// Fetch and cache full artist details (like avatars) on-demand.
 
-    if (cachedIndex) {
-        const artists = [];
-        for (const channelId of cachedIndex) {
-            const artistData = await getCachedData(`artist_detail_${channelId}`);
-            if (artistData) {
-                artists.push(artistData);
-            } else {
-                // If any artist is missing, the cache is stale. Fetch all.
-                console.warn(`Cache miss for artist ${channelId}. Refetching entire whitelist.`);
-                return await fetchAndCacheAllArtists();
-            }
-        }
-        return artists;
+export async function fetchArtistWhitelist() {
+    const cacheKey = 'artist_whitelist_basic';
+    const cachedData = await getCachedData(cacheKey);
+    if (cachedData) {
+        return cachedData;
     }
 
-    return await fetchAndCacheAllArtists();
-}
-
-async function fetchAndCacheAllArtists() {
     try {
         const { data: artists, error } = await supabase.from('artists').select('name, channel_id');
         if (error) throw error;
         if (!artists || artists.length === 0) return [];
 
-        const channelIds = artists
-            .map(a => a.channel_id)
-            .filter(id => id && id.trim() !== '');
+        const validArtists = artists.filter(a => a.channel_id && a.channel_id.trim() !== '');
 
-        if (channelIds.length === 0) return [];
+        setCachedData(cacheKey, validArtists);
+        return validArtists;
+    } catch (error) {
+        console.error('Error fetching artist whitelist:', error);
+        return [];
+    }
+}
 
-        const allChannelItems = [];
-        const chunkSize = 50;
-        for (let i = 0; i < channelIds.length; i += chunkSize) {
-            const chunk = channelIds.slice(i, i + chunkSize);
-            const channelData = await fetchFromProxy('channels', {
-                part: 'snippet',
-                id: chunk.join(','),
-            });
-            if (channelData && channelData.items) {
-                allChannelItems.push(...channelData.items);
-            }
-        }
+export async function getArtistDetails(artist) {
+    const cacheKey = `artist_detail_${artist.channel_id}`;
+    const cachedData = await getCachedData(cacheKey);
+    if (cachedData) {
+        // Return a merged object, ensuring the latest name from the whitelist is used.
+        return { ...cachedData, name: artist.name };
+    }
 
-        const artistsWithAvatars = artists.map(artist => {
-            const channel = allChannelItems.find(c => c.id === artist.channel_id);
-            let avatarUrl = channel ? channel.snippet.thumbnails.default.url : null;
+    try {
+        const channelData = await fetchFromProxy('channels', {
+            part: 'snippet',
+            id: artist.channel_id,
+        });
+
+        if (channelData && channelData.items && channelData.items.length > 0) {
+            const channel = channelData.items[0];
+            let avatarUrl = channel.snippet.thumbnails.default.url;
+
             if (avatarUrl && avatarUrl.startsWith('//')) {
                 avatarUrl = 'https:' + avatarUrl;
             } else if (avatarUrl) {
                 avatarUrl = avatarUrl.replace(/^http:/, 'https:');
             }
-            return { ...artist, avatar: avatarUrl };
-        });
 
-        // Cache each artist individually and the index
-        artistsWithAvatars.forEach(artist => {
-            setCachedData(`artist_detail_${artist.channel_id}`, artist);
-        });
-        const newIndex = artistsWithAvatars.map(a => a.channel_id);
-        setCachedData('artist_whitelist_index', newIndex);
-
-        return artistsWithAvatars;
+            const details = { ...artist, avatar: avatarUrl };
+            setCachedData(cacheKey, details);
+            return details;
+        }
+        return artist; // Return basic artist info if API fails
     } catch (error) {
-        console.error('Error fetching artist whitelist:', error);
-        return [];
+        console.error(`Error fetching details for artist ${artist.name}:`, error);
+        return artist; // Return basic info on error
     }
 }
 

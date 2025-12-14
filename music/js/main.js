@@ -1,5 +1,5 @@
 
-import { fetchArtistWhitelist, fetchFromProxy, parseYoutubeItem, fetchArtistAlbums, fetchPlaylistItems } from './api.js';
+import { fetchArtistWhitelist, getArtistDetails, fetchFromProxy, parseYoutubeItem, fetchArtistAlbums, fetchPlaylistItems } from './api.js';
 import * as Player from './player.js';
 import * as UI from './ui.js';
 
@@ -198,8 +198,24 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.renderHomePage(state.recentlyPlayed, onTrackClick);
     }
 
-    function renderArtists() {
-        UI.renderArtists(state.artistWhitelist, fetchArtistDetails);
+    async function renderArtists() {
+        const artistsContent = document.getElementById('artistsContent');
+        UI.setLoading(artistsContent, true);
+
+        try {
+            const artistDetailsPromises = state.artistWhitelist.map(artist => getArtistDetails(artist));
+            const artistsWithDetails = await Promise.all(artistDetailsPromises);
+
+            // It's possible the user navigated away while we were loading
+            if (state.currentPage === 1) {
+                UI.renderArtists(artistsWithDetails, fetchArtistDetails);
+            }
+        } catch (error) {
+            console.error("Error loading artist details:", error);
+            if (state.currentPage === 1) {
+                UI.renderError(artistsContent, "Could not load artists. Please try again later.");
+            }
+        }
     }
 
     function renderLibraryPage() {
