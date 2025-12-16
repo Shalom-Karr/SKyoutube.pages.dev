@@ -31,9 +31,6 @@ export function cacheDOM() {
     dom.settingsBtn = document.getElementById('settingsBtn');
     dom.settingsPanel = document.getElementById('settingsPanel');
     dom.spinToggle = document.getElementById('spinToggle');
-    dom.sidebarPlayer = document.getElementById('sidebarPlayer');
-    dom.sidebarPlayerThumb = document.getElementById('sidebarPlayerThumb');
-    dom.sidebarPlayerTitle = document.getElementById('sidebarPlayerTitle');
 }
 
 export function switchTab(tabIndex, state, renderCallbacks) {
@@ -83,13 +80,21 @@ export function updatePlayerUI(track, activeQueue, trackIndex) {
     dom.artwork.innerHTML = `<img src="${thumbnailUrl}" alt="${track.title}">`;
     dom.playerBackground.style.backgroundImage = `url(${thumbnailUrl})`;
 
-    // Update sidebar player
-    dom.sidebarPlayer.style.display = 'flex';
-    dom.sidebarPlayerThumb.innerHTML = `<img src="${thumbnailUrl}" alt="${track.title}">`;
-    dom.sidebarPlayerTitle.textContent = track.title;
-
     renderUpNext(activeQueue, trackIndex);
-    updateNowPlayingIndicator(track.videoId);
+
+    // Re-render the current view to update the now-playing indicator
+    const currentPage = document.querySelector('.page.active');
+    if (currentPage) {
+        const pageId = currentPage.id;
+        if (pageId === 'searchPage') {
+            const results = Array.from(dom.searchContent.querySelectorAll('.list-item')).map(item => {
+                // This is a bit of a hack to get the track data back
+                return activeQueue.find(t => t.title === item.querySelector('.list-title').textContent);
+            });
+            renderSearchResults(results, (q, i) => Player.setQueue(q, i));
+        }
+        // Add similar logic for other pages if needed
+    }
 }
 
 export function openFullPlayer() {
@@ -170,7 +175,7 @@ export function renderArtists(artistWhitelist, onArtistClick) {
     dom.artistsContent.appendChild(grid);
 }
 
-export function renderArtistPage(artist, albums, songs, onTrackClick, onAlbumClick, favorites, onFavoriteClick) {
+export function renderArtistPage(artist, albums, songs, onTrackClick, onAlbumClick) {
     dom.pageTitle.textContent = artist.name;
     dom.artistsContent.innerHTML = ''; // Clear artist grid
 
@@ -188,8 +193,7 @@ export function renderArtistPage(artist, albums, songs, onTrackClick, onAlbumCli
         const songsList = document.createElement('div');
         songsList.className = 'song-list';
         songs.forEach((song, index) => {
-            const isFavorite = favorites.some(f => f.videoId === song.videoId);
-            const item = createTrackListItem(song, songs, index, onTrackClick, onFavoriteClick, isFavorite);
+            const item = createTrackListItem(song, songs, index, onTrackClick);
             songsList.appendChild(item);
         });
         dom.artistsContent.appendChild(songsList);
@@ -209,7 +213,7 @@ function createAlbumCard(album, onAlbumClick) {
     return card;
 }
 
-export function renderSearchResults(results, onTrackClick, favorites, onFavoriteClick) {
+export function renderSearchResults(results, onTrackClick) {
     dom.searchContent.innerHTML = '';
     if (results.length === 0) {
         dom.searchContent.innerHTML = '<p>No results found.</p>';
@@ -218,14 +222,13 @@ export function renderSearchResults(results, onTrackClick, favorites, onFavorite
     const list = document.createElement('div');
     list.className = 'song-list';
     results.forEach((song, index) => {
-        const isFavorite = favorites.some(f => f.videoId === song.videoId);
-        const item = createTrackListItem(song, results, index, onTrackClick, onFavoriteClick, isFavorite);
+        const item = createTrackListItem(song, results, index, onTrackClick);
         list.appendChild(item);
     });
     dom.searchContent.appendChild(list);
 }
 
-export function renderLibraryPage(playlists, favorites, saveQueueCallback, onTrackClick, onFavoriteClick) {
+export function renderLibraryPage(playlists, favorites, saveQueueCallback, onTrackClick) {
     if (!dom.libraryContent) return;
     dom.libraryContent.innerHTML = `
         <div class="library-actions">
@@ -256,7 +259,7 @@ export function renderLibraryPage(playlists, favorites, saveQueueCallback, onTra
         const list = document.createElement('div');
         list.className = 'song-list';
         favorites.forEach((track, index) => {
-            const item = createTrackListItem(track, favorites, index, onTrackClick, onFavoriteClick, true);
+            const item = createTrackListItem(track, favorites, index, onTrackClick);
             list.appendChild(item);
         });
         favoritesContainer.appendChild(list);
@@ -279,7 +282,6 @@ function createPlaylistListItem(playlist, onTrackClick) {
 function createTrackCard(track, queue, onTrackClick) {
     const card = document.createElement('div');
     card.className = 'artist-card';
-    card.dataset.videoId = track.videoId; // Add videoId for tracking
     card.innerHTML = `
         <div class="artist-avatar">
             <img src="${track.thumbnail}" alt="${track.title}">
@@ -291,12 +293,14 @@ function createTrackCard(track, queue, onTrackClick) {
     return card;
 }
 
-function createTrackListItem(track, queue, index, onTrackClick, onFavoriteClick, isFavorite = false) {
+function createTrackListItem(track, queue, index, onTrackClick) {
     const item = document.createElement('div');
     item.className = 'list-item';
-    item.dataset.videoId = track.videoId;
 
-    const favoriteIcon = isFavorite ? '&#10005;' : '&#9829;';
+    const currentTrack = getCurrentTrack();
+    if (currentTrack && currentTrack.videoId === track.videoId) {
+        item.classList.add('now-playing');
+    }
 
     item.innerHTML = `
         <div class="list-thumb"><img src="${track.thumbnail}" alt="${track.title}"></div>
@@ -304,25 +308,9 @@ function createTrackListItem(track, queue, index, onTrackClick, onFavoriteClick,
             <div class="list-title">${track.title}</div>
             <div class="list-sub">${track.artist}</div>
         </div>
-        <button class="icon-btn favorite-btn">${favoriteIcon}</button>
     `;
-
-    item.querySelector('.list-info').addEventListener('click', () => onTrackClick(queue, index));
-    item.querySelector('.favorite-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        onFavoriteClick(track);
-    });
-
+    item.addEventListener('click', () => onTrackClick(queue, index));
     return item;
-}
-
-export function showToast(message) {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
 }
 
 export function setLoading(container, isLoading) {
@@ -332,31 +320,4 @@ export function setLoading(container, isLoading) {
         const spinner = container.querySelector('.loading');
         if (spinner) spinner.remove();
     }
-}
-
-export function updateNowPlayingIndicator(videoId) {
-    document.querySelectorAll('[data-video-id]').forEach(el => {
-        el.classList.remove('now-playing');
-    });
-    document.querySelectorAll(`[data-video-id="${videoId}"]`).forEach(el => {
-        el.classList.add('now-playing');
-    });
-}
-
-export function renderError(container, message) {
-    container.innerHTML = `<div class="error-message">${message}</div>`;
-}
-
-export function renderAlbumTracklist(album, tracks, onTrackClick, favorites, onFavoriteClick) {
-    dom.pageTitle.textContent = album.title;
-    dom.artistsContent.innerHTML = ''; // Clear the current view
-
-    const songsList = document.createElement('div');
-    songsList.className = 'song-list';
-    tracks.forEach((song, index) => {
-        const isFavorite = favorites.some(f => f.videoId === song.videoId);
-        const item = createTrackListItem(song, tracks, index, onTrackClick, onFavoriteClick, isFavorite);
-        songsList.appendChild(item);
-    });
-    dom.artistsContent.appendChild(songsList);
 }

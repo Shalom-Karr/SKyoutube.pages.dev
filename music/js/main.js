@@ -1,5 +1,5 @@
 
-import { fetchArtistWhitelist, getArtistDetails, fetchFromProxy, parseYoutubeItem, fetchArtistAlbums, fetchPlaylistItems } from './api.js';
+import { fetchAllArtists, fetchFromProxy, parseYoutubeItem, fetchArtistAlbums, fetchPlaylistItems } from './api.js';
 import * as Player from './player.js';
 import * as UI from './ui.js';
 
@@ -39,13 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.data === YT.PlayerState.ENDED) {
             Player.playNext(true);
         }
-    }
-
-    function onTrackChange(track, queue, index) {
-        if (!track) return;
-        UI.updatePlayerUI(track, queue, index);
-        UI.updateNowPlayingIndicator(track.videoId);
-        addRecentlyPlayed(track);
     }
 
     function startProgressUpdates() {
@@ -89,15 +82,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const isFavorite = state.favorites.some(t => t.videoId === track.videoId);
         if (isFavorite) {
             state.favorites = state.favorites.filter(t => t.videoId !== track.videoId);
-            UI.showToast('Removed from Favorites');
         } else {
             state.favorites = [track, ...state.favorites];
-            UI.showToast('Added to Favorites');
         }
         localStorage.setItem('favorites', JSON.stringify(state.favorites));
-        if (state.currentPage === 3) {
-            renderLibraryPage();
-        }
+        renderLibraryPage();
     }
 
     function saveQueueAsPlaylist() {
@@ -143,8 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function shuffleAll() {
-        const homeContent = document.getElementById('homeContent');
-        UI.setLoading(homeContent, true);
+        UI.setLoading(document.getElementById('homeContent'), true);
         let allSongs = [];
         try {
             for (const artist of state.artistWhitelist) {
@@ -168,8 +156,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('Error during Shuffle All:', error);
-            UI.renderError(homeContent, 'Could not shuffle all. Please try again later.');
         } finally {
+            UI.setLoading(document.getElementById('homeContent'), false);
             renderHomePage();
         }
     }
@@ -198,24 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
         UI.renderHomePage(state.recentlyPlayed, onTrackClick);
     }
 
-    async function renderArtists() {
-        const artistsContent = document.getElementById('artistsContent');
-        UI.setLoading(artistsContent, true);
-
-        try {
-            const artistDetailsPromises = state.artistWhitelist.map(artist => getArtistDetails(artist));
-            const artistsWithDetails = await Promise.all(artistDetailsPromises);
-
-            // It's possible the user navigated away while we were loading
-            if (state.currentPage === 1) {
-                UI.renderArtists(artistsWithDetails, fetchArtistDetails);
-            }
-        } catch (error) {
-            console.error("Error loading artist details:", error);
-            if (state.currentPage === 1) {
-                UI.renderError(artistsContent, "Could not load artists. Please try again later.");
-            }
-        }
+    function renderArtists() {
+        UI.renderArtists(state.artistWhitelist, fetchArtistDetails);
     }
 
     function renderLibraryPage() {
@@ -281,10 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // This needs to be in the global scope so the YouTube API can call it.
+    window.onYouTubeIframeAPIReady = () => {
+        Player.initYouTubePlayer(onPlayerReady, onPlayerStateChange, onTrackChange);
+    };
+
+    function onPlayerReady() {
+        console.log("Player is ready, loading initial data.");
+        // Now that the player is ready, we can fetch data and render the app.
+        init();
+    }
+
     async function init() {
         document.documentElement.setAttribute('data-theme', state.theme);
-        Player.initYouTubePlayer(null, onPlayerStateChange, onTrackChange);
-        let artistData = await fetchArtistWhitelist();
+        let artistData = await fetchAllArtists();
         state.artistWhitelist = artistData;
 
         document.getElementById('spinToggle').checked = state.settings.albumArtSpin;
@@ -292,6 +274,4 @@ document.addEventListener('DOMContentLoaded', () => {
         bindEventListeners();
         console.log("SK Music player loaded and ready.");
     }
-
-    init();
 });

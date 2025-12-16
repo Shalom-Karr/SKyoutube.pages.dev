@@ -11,11 +11,9 @@ const state = {
 };
 
 let onStateChangeCallback;
-let onTrackChangeCallback;
 
-export function initYouTubePlayer(onReadyCallback, onStateChange, onTrackChange) {
+export function initYouTubePlayer(onReadyCallback, onStateChange) {
     onStateChangeCallback = onStateChange;
-    onTrackChangeCallback = onTrackChange;
     window.onYouTubeIframeAPIReady = () => {
         console.log("YouTube API is ready.");
         player = new YT.Player('yt-player', {
@@ -42,12 +40,6 @@ function onPlayerReady(callback) {
     if (callback) callback();
 }
 
-function notifyTrackChange() {
-    if (onTrackChangeCallback) {
-        onTrackChangeCallback(getCurrentTrack(), getActiveQueue(), state.trackIndex);
-    }
-}
-
 export function loadVideo(track, play = false) {
     if (playerReady) {
         state.currentTrack = track;
@@ -55,7 +47,8 @@ export function loadVideo(track, play = false) {
         if (play) {
             player.playVideo();
         }
-        notifyTrackChange();
+        // Call the state change callback to update the UI
+        if (onStateChangeCallback) onStateChangeCallback({ data: -1 }); // Emulate a state change
     }
 }
 
@@ -116,12 +109,9 @@ export function toggleShuffle() {
     if (state.shuffleMode) {
         shuffleQueue(state.trackIndex);
     } else {
-        // Find the index of the current track in the original queue
-        const currentTrack = getCurrentTrack(); // This is from the shuffled queue
+        const currentTrack = getCurrentTrack();
         state.trackIndex = state.queue.findIndex(t => t.videoId === currentTrack.videoId);
     }
-    // Notify that the queue has changed, which affects the "Up Next" list
-    notifyTrackChange();
     return state.shuffleMode;
 }
 
