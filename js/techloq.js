@@ -19,8 +19,8 @@
     const PROXY_DOMAIN = 'https://example.com'; // Replace with the actual proxy domain
     const REDIRECT_CONFIG = [
         { type: 'path', sourceDomain: 'forums.jtechforums.org', targetDomain: 'https://jtechwebsite.shalomkarr.workers.dev' },
-        { type: 'youtube', sourceDomain: 'www.youtube.com', targetDomain: 'https://skyoutubebeta.netlify.app' },
-        { type: 'youtube', sourceDomain: 'music.youtube.com', targetDomain: 'https://skyoutubebeta.netlify.app' }
+        { type: 'youtube', sourceDomain: 'www.youtube.com', targetDomain: 'https://skyoutube.pages.dev' },
+        { type: 'youtube', sourceDomain: 'music.youtube.com', targetDomain: 'https://skyoutube.pages.dev' }
     ];
 
     // Polling Settings for Techloq

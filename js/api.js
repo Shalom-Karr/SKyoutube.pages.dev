@@ -1,6 +1,6 @@
-// --- NETLIFY FUNCTION PROXY ---
+// --- CLOUDFLARE PAGES FUNCTION PROXY ---
 export async function fetchFromProxy(endpoint, params) {
-    const proxyUrl = `/.netlify/functions/youtubeproxy?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
+    const proxyUrl = `/api/youtubeproxy?endpoint=${endpoint}&params=${encodeURIComponent(params)}`;
     try {
         const response = await fetch(proxyUrl);
         if (!response.ok) {
