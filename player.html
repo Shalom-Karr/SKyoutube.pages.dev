@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advanced Media Player</title>
+    <style>
+      body {
+        background-color: #000;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        color: #fff;
+      }
+
+      .media-container {
+        max-width: 100%;
+        width: 720px;
+        background: #111;
+        padding: 20px;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+      }
+
+      video,
+      audio {
+        width: 100%;
+        border-radius: 8px;
+        background-color: #000;
+      }
+
+      .waveform-container {
+        position: relative;
+        width: 100%;
+        margin-top: 0;
+      }
+
+      #waveform {
+        width: 100%;
+        height: 100px;
+        background: #111;
+        display: block;
+        cursor: pointer;
+      }
+
+      #progressOverlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        pointer-events: none;
+      }
+
+      input[type="file"],
+      .controls {
+        margin-top: 20px;
+        width: 100%;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .controls label {
+        margin-right: 10px;
+        white-space: nowrap;
+      }
+
+      .controls input[type="number"] {
+        width: 100px;
+        padding: 5px;
+        font-size: 16px;
+        background: #222;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 6px;
+      }
+
+      input[type="file"] {
+        background: #222;
+        color: #fff;
+        border: 1px solid #555;
+        padding: 5px;
+        border-radius: 6px;
+      }
+
+      .queue-container {
+        margin-top: 20px;
+        background: #222;
+        border-radius: 8px;
+        padding: 15px;
+      }
+
+      .queue-container h3 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        color: #4a9eff;
+      }
+
+      .queue-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .queue-item {
+        background: #333;
+        padding: 10px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: move;
+        user-select: none;
+        transition: background 0.2s;
+      }
+
+      .queue-item:hover {
+        background: #444;
+      }
+
+      .queue-item.dragging {
+        opacity: 0.5;
+      }
+
+      .queue-item.drag-over {
+        border-top: 2px solid #4a9eff;
+      }
+
+      .queue-item.playing {
+        background: #4a9eff;
+        color: #000;
+        font-weight: bold;
+      }
+
+      .queue-item-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin-right: 10px;
+      }
+
+      .queue-item button {
+        background: #555;
+        color: #fff;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .queue-item button:hover {
+        background: #777;
+      }
+
+      .queue-item.playing button {
+        background: #000;
+        color: #fff;
+      }
+
+      .queue-empty {
+        color: #777;
+        font-style: italic;
+        text-align: center;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="media-container">
+      <video id="videoPlayer" controls tabindex="0"></video>
+      <audio id="audioPlayer" controls hidden tabindex="0"></audio>
+
+      <div class="waveform-container">
+        <canvas id="waveform"></canvas>
+        <canvas id="progressOverlay"></canvas>
+      </div>
+
+      <input type="file" id="fileInput" accept="video/*,audio/*" multiple />
+
+      <div class="controls">
+        <label for="speedControl">Speed:</label>
+        <input
+          type="number"
+          id="speedControl"
+          min="0.1"
+          max="100"
+          step="0.1"
+          value="1.0"
+        />
+      </div>
+
+      <div class="queue-container">
+        <h3>Queue</h3>
+        <ul class="queue-list" id="queueList">
+          <li class="queue-empty">
+            No files in queue. Select multiple files to queue them.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const videoPlayer = document.getElementById("videoPlayer");
+      const audioPlayer = document.getElementById("audioPlayer");
+      const speedControl = document.getElementById("speedControl");
+      const canvas = document.getElementById("waveform");
+      const ctx = canvas.getContext("2d");
+      const progressCanvas = document.getElementById("progressOverlay");
+      const progressCtx = progressCanvas.getContext("2d");
+      const queueList = document.getElementById("queueList");
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // Queue management
+      let mediaQueue = [];
+      let currentQueueIndex = -1;
+      let currentAudioBuffer = null;
+      let currentPlaybackSpeed = 1.0;
+      
+      // Drag and drop state
+      let draggedIndex = null;
+
+      // Ensure canvas drawing size matches its CSS size
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width || 1;
+        canvas.height = rect.height || 1;
+        progressCanvas.width = rect.width || 1;
+        progressCanvas.height = rect.height || 1;
+
+        // Redraw waveform if we have audio buffer
+        if (currentAudioBuffer) {
+          drawFullWaveform(currentAudioBuffer);
+        }
+      }
+
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      // Draw a static waveform for the entire file (single channel)
+      function drawFullWaveform(audioBuffer) {
+        currentAudioBuffer = audioBuffer;
+        const sampleCount = canvas.width;
+        if (sampleCount <= 0) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Use first channel only
+        const channelData = audioBuffer.getChannelData(0);
+        const blockSize = Math.max(
+          1,
+          Math.floor(channelData.length / sampleCount)
+        );
+        const waveform = new Float32Array(sampleCount);
+
+        // Calculate average amplitude for each pixel
+        for (let i = 0; i < sampleCount; i++) {
+          let sum = 0;
+          const start = i * blockSize;
+          const end = Math.min(start + blockSize, channelData.length);
+          for (let j = start; j < end; j++) {
+            sum += Math.abs(channelData[j]);
+          }
+          waveform[i] = sum / (end - start || 1);
+        }
+
+        // Draw waveform
+        ctx.lineWidth = 1;
+        ctx.fillStyle = "#4a9eff";
+
+        const midY = canvas.height / 2;
+        const halfHeight = canvas.height / 2;
+        const amplification = 7; // Make waves taller
+
+        for (let x = 0; x < waveform.length; x++) {
+          const v = waveform[x];
+          const barHeight = Math.min(
+            v * halfHeight * amplification,
+            halfHeight
+          );
+          ctx.fillRect(x, midY - barHeight, 1, barHeight * 2);
+        }
+      }
+
+      // Draw progress overlay on waveform
+      function drawProgressOverlay() {
+        const player = videoPlayer.hidden ? audioPlayer : videoPlayer;
+        if (!player.duration || isNaN(player.duration)) {
+          requestAnimationFrame(drawProgressOverlay);
+          return;
+        }
+
+        progressCtx.clearRect(
+          0,
+          0,
+          progressCanvas.width,
+          progressCanvas.height
+        );
+
+        const progress = player.currentTime / player.duration;
+        const progressX = progress * progressCanvas.width;
+
+        // Draw semi-transparent overlay for played portion
+        progressCtx.fillStyle = "rgba(74, 158, 255, 0.3)";
+        progressCtx.fillRect(0, 0, progressX, progressCanvas.height);
+
+        // Draw progress line
+        progressCtx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        progressCtx.fillRect(progressX - 1, 0, 2, progressCanvas.height);
+
+        requestAnimationFrame(drawProgressOverlay);
+      }
+
+      // Start progress overlay animation
+      drawProgressOverlay();
+
+      // Update queue display
+      function updateQueueDisplay() {
+        queueList.innerHTML = "";
+
+        if (mediaQueue.length === 0) {
+          queueList.innerHTML =
+            '<li class="queue-empty">No files in queue. Select multiple files to queue them.</li>';
+          return;
+        }
+
+        mediaQueue.forEach((item, index) => {
+          const li = document.createElement("li");
+          li.className =
+            "queue-item" + (index === currentQueueIndex ? " playing" : "");
+          li.draggable = true;
+          li.dataset.index = index;
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "queue-item-name";
+          nameSpan.textContent = item.name;
+
+          const removeBtn = document.createElement("button");
+          removeBtn.textContent = "Remove";
+          removeBtn.onclick = () => removeFromQueue(index);
+
+          // Drag and drop event handlers
+          li.addEventListener("dragstart", handleDragStart);
+          li.addEventListener("dragend", handleDragEnd);
+          li.addEventListener("dragover", handleDragOver);
+          li.addEventListener("drop", handleDrop);
+          li.addEventListener("dragleave", handleDragLeave);
+
+          // Double-click to play
+          li.addEventListener("dblclick", () => {
+            playQueueItem(index);
+          });
+
+          li.appendChild(nameSpan);
+          li.appendChild(removeBtn);
+          queueList.appendChild(li);
+        });
+      }
+
+      // Drag and drop handlers
+      function handleDragStart(e) {
+        draggedIndex = parseInt(e.currentTarget.dataset.index);
+        e.currentTarget.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      }
+
+      function handleDragEnd(e) {
+        e.currentTarget.classList.remove("dragging");
+        // Remove all drag-over classes
+        document.querySelectorAll(".queue-item").forEach((item) => {
+          item.classList.remove("drag-over");
+        });
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const targetIndex = parseInt(e.currentTarget.dataset.index);
+        if (targetIndex !== draggedIndex) {
+          e.currentTarget.classList.add("drag-over");
+        }
+        return false;
+      }
+
+      function handleDragLeave(e) {
+        e.currentTarget.classList.remove("drag-over");
+      }
+
+      function handleDrop(e) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const targetIndex = parseInt(e.currentTarget.dataset.index);
+
+        if (draggedIndex !== null && draggedIndex !== targetIndex) {
+          // Reorder the queue
+          const draggedItem = mediaQueue[draggedIndex];
+          mediaQueue.splice(draggedIndex, 1);
+          mediaQueue.splice(targetIndex, 0, draggedItem);
+
+          // Update currentQueueIndex if necessary
+          if (currentQueueIndex === draggedIndex) {
+            currentQueueIndex = targetIndex;
+          } else if (draggedIndex < currentQueueIndex && targetIndex >= currentQueueIndex) {
+            currentQueueIndex--;
+          } else if (draggedIndex > currentQueueIndex && targetIndex <= currentQueueIndex) {
+            currentQueueIndex++;
+          }
+
+          updateQueueDisplay();
+        }
+
+        return false;
+      }
+
+      // Remove item from queue
+      function removeFromQueue(index) {
+        if (index === currentQueueIndex) {
+          // If removing currently playing item, play next
+          mediaQueue.splice(index, 1);
+          if (mediaQueue.length > 0) {
+            currentQueueIndex = Math.min(index, mediaQueue.length - 1);
+            playQueueItem(currentQueueIndex);
+          } else {
+            currentQueueIndex = -1;
+            // Clear players
+            videoPlayer.src = "";
+            audioPlayer.src = "";
+            currentAudioBuffer = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            progressCtx.clearRect(
+              0,
+              0,
+              progressCanvas.width,
+              progressCanvas.height
+            );
+          }
+        } else {
+          mediaQueue.splice(index, 1);
+          if (index < currentQueueIndex) {
+            currentQueueIndex--;
+          }
+        }
+        updateQueueDisplay();
+      }
+
+      // Play specific queue item
+      async function playQueueItem(index) {
+        if (index < 0 || index >= mediaQueue.length) return;
+
+        currentQueueIndex = index;
+        const item = mediaQueue[index];
+
+        updateQueueDisplay();
+
+        // Load media
+        loadMedia(item.url, item.isAudio);
+
+        // Decode for waveform
+        try {
+          if (audioCtx.state === "suspended") {
+            await audioCtx.resume();
+          }
+          const arrayBuffer = await item.file.arrayBuffer();
+          const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+          resizeCanvas();
+          drawFullWaveform(audioBuffer);
+        } catch (err) {
+          console.warn("Could not decode audio for waveform:", err);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          currentAudioBuffer = null;
+        }
+      }
+
+      // Play next in queue
+      function playNext() {
+        if (currentQueueIndex < mediaQueue.length - 1) {
+          playQueueItem(currentQueueIndex + 1);
+        }
+      }
+
+      // Just load/play media; no realtime analyzer
+      function loadMedia(url, isAudio) {
+        if (isAudio) {
+          audioPlayer.src = url;
+          audioPlayer.hidden = false;
+          videoPlayer.hidden = true;
+          audioPlayer.load();
+          
+          // Set playback rate after metadata loads
+          audioPlayer.onloadedmetadata = () => {
+            audioPlayer.playbackRate = currentPlaybackSpeed;
+            audioPlayer.focus(); // Focus so arrow keys work
+          };
+          
+          audioPlayer
+            .play()
+            .catch((err) =>
+              console.warn("Audio play blocked by browser:", err)
+            );
+        } else {
+          videoPlayer.src = url;
+          videoPlayer.hidden = false;
+          audioPlayer.hidden = true;
+          videoPlayer.load();
+          
+          // Set playback rate after metadata loads
+          videoPlayer.onloadedmetadata = () => {
+            videoPlayer.playbackRate = currentPlaybackSpeed;
+            videoPlayer.focus(); // Focus so arrow keys work
+          };
+          
+          videoPlayer
+            .play()
+            .catch((err) =>
+              console.warn("Video play blocked by browser:", err)
+            );
+        }
+      }
+
+      // Handle media ended event to play next in queue
+      videoPlayer.addEventListener("ended", playNext);
+      audioPlayer.addEventListener("ended", playNext);
+
+      // Force refocus after any seek to ensure arrow keys work
+      videoPlayer.addEventListener("seeked", function() {
+        setTimeout(() => {
+          videoPlayer.focus();
+        }, 0);
+      });
+      audioPlayer.addEventListener("seeked", function() {
+        setTimeout(() => {
+          audioPlayer.focus();
+        }, 0);
+      });
+      
+      // Try window-level capture as absolute first line of defense
+      window.addEventListener("keydown", function(e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          const player = videoPlayer.hidden ? audioPlayer : videoPlayer;
+          
+          // If player is playing or has focus, intercept
+          if ((document.activeElement === videoPlayer || document.activeElement === audioPlayer) ||
+              (player.duration && !player.paused)) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            
+            if (!player.duration) return;
+            
+            if (e.key === "ArrowRight") {
+              player.currentTime = Math.min(player.currentTime + 2, player.duration);
+            } else {
+              player.currentTime = Math.max(player.currentTime - 2, 0);
+            }
+            return false;
+          }
+        }
+      }, true);
+
+      // Also add document-level capture to block any browser defaults
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          const activeElement = document.activeElement;
+          const player = videoPlayer.hidden ? audioPlayer : videoPlayer;
+          
+          // Handle arrow keys if media player has focus OR if it's playing
+          if (activeElement === videoPlayer || activeElement === audioPlayer || 
+              (player.duration && !player.paused)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            
+            if (!player.duration) return;
+            
+            if (e.key === "ArrowRight") {
+              player.currentTime = Math.min(player.currentTime + 2, player.duration);
+            } else {
+              player.currentTime = Math.max(player.currentTime - 2, 0);
+            }
+            
+            // Ensure player has focus for consistent behavior
+            player.focus();
+          }
+        }
+      }, true);
+
+
+      fileInput.addEventListener("change", async function () {
+        const files = Array.from(this.files);
+        if (files.length === 0) return;
+
+        // Add files to queue
+        files.forEach((file) => {
+          const url = URL.createObjectURL(file);
+          const isAudio = file.type.startsWith("audio/");
+          mediaQueue.push({
+            file: file,
+            url: url,
+            isAudio: isAudio,
+            name: file.name,
+          });
+        });
+
+        updateQueueDisplay();
+
+        // If nothing is playing, start playing first item
+        if (currentQueueIndex === -1 && mediaQueue.length > 0) {
+          playQueueItem(0);
+        }
+
+        // Clear file input so same files can be added again
+        this.value = "";
+      });
+
+      // Speed control
+      speedControl.addEventListener("input", function () {
+        const val = parseFloat(this.value);
+        if (isNaN(val) || val <= 0) return;
+
+        currentPlaybackSpeed = val;
+        if (!videoPlayer.hidden) videoPlayer.playbackRate = val;
+        if (!audioPlayer.hidden) audioPlayer.playbackRate = val;
+      });
+
+      // Click on waveform to seek
+      canvas.addEventListener("click", function (e) {
+        const player = videoPlayer.hidden ? audioPlayer : videoPlayer;
+        if (!player.duration) return; // No media loaded yet
+
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const percentage = x / rect.width;
+        const newTime = percentage * player.duration;
+
+        player.currentTime = Math.max(0, Math.min(newTime, player.duration));
+        
+        // Refocus the player so arrow keys work correctly
+        player.focus();
+      });
+
+      // Keyboard shortcuts
+      window.addEventListener("keydown", function (e) {
+        const tag = document.activeElement.tagName.toLowerCase();
+        if (tag === "input") return;
+
+        const player = videoPlayer.hidden ? audioPlayer : videoPlayer;
+
+        switch (e.key) {
+          case "d":
+          case "D":
+            e.preventDefault();
+            player.playbackRate = Math.min(player.playbackRate + 0.1, 100);
+            currentPlaybackSpeed = player.playbackRate;
+            break;
+          case "s":
+          case "S":
+            e.preventDefault();
+            player.playbackRate = Math.max(player.playbackRate - 0.1, 0.1);
+            currentPlaybackSpeed = player.playbackRate;
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            player.currentTime = Math.min(
+              player.currentTime + 2,
+              player.duration || player.currentTime + 2
+            );
+            break;
+          case "ArrowLeft":
+            e.preventDefault();
+            player.currentTime = Math.max(player.currentTime - 2, 0);
+            break;
+          case " ":
+          case "Spacebar":
+            e.preventDefault();
+            if (player.paused) player.play();
+            else player.pause();
+            break;
+          default:
+            return;
+        }
+
+        try {
+          speedControl.value = currentPlaybackSpeed.toFixed(1);
+        } catch (err) {
+          console.warn(
+            "Cannot update speed indicator: video controller UI not fully initialized"
+          );
+        }
+      });
+    </script>
+  </body>
+</html>
