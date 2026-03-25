@@ -1,5 +1,7 @@
 // functions/api/youtubeproxy.js
 
+const ALLOWED_ENDPOINTS = new Set(['search', 'videos', 'channels', 'playlists', 'playlistItems']);
+
 export async function onRequest(context) {
     const YOUTUBE_API_KEY = context.env.YOUTUBE_API_KEY;
 
@@ -18,6 +20,13 @@ export async function onRequest(context) {
     if (!endpoint) {
         return new Response(
             JSON.stringify({ error: "Missing 'endpoint' parameter." }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+    }
+
+    if (!ALLOWED_ENDPOINTS.has(endpoint)) {
+        return new Response(
+            JSON.stringify({ error: "Invalid 'endpoint' parameter." }),
             { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
     }

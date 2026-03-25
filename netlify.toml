@@ -1,0 +1,11 @@
+[build.environment]
+  NODE_VERSION = "18"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/youtubeproxy"
+  to = "/.netlify/functions/youtubeproxy"
+  status = 200
+  force = true
