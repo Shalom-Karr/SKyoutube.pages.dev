@@ -1,4 +1,4 @@
-// functions/api/youtube-proxy.js
+// functions/api/youtubeproxy.js
 
 export async function onRequest(context) {
     const YOUTUBE_API_KEY = context.env.YOUTUBE_API_KEY;
